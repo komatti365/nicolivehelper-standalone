@@ -1,3 +1,45 @@
+
+async function initAccountSettings() {
+  const updateStatus = async () => {
+    if (typeof window.stsen !== 'undefined' && window.stsen.getAccountStatus) {
+      try {
+        const status = await window.stsen.getAccountStatus();
+        if (status && status.loggedIn) {
+          $('#opt-account-status').text('ログイン中').css('color', '#28a745');
+          const name = (status.user && status.user.nickname) || '';
+          const id = (status.user && status.user.id) ? '(ID: ' + status.user.id + ')' : '';
+          $('#opt-account-details').text(name + ' ' + id);
+          $('#opt-btn-login').text('再ログイン');
+          $('#opt-btn-logout').show();
+        } else {
+          $('#opt-account-status').text('未ログイン').css('color', '#dc3545');
+          $('#opt-account-details').text('※内蔵ブラウザでログインしてください');
+          $('#opt-btn-login').text('ログイン');
+          $('#opt-btn-logout').hide();
+        }
+      } catch (e) {
+        console.error('Failed to get account status:', e);
+      }
+    }
+  };
+
+  if (typeof window.stsen !== 'undefined') {
+    $('#opt-btn-login').on('click', () => {
+      window.stsen.openLoginWindow();
+    });
+    $('#opt-btn-logout').on('click', async () => {
+      if (confirm('ニコニコからログアウトしますか？')) {
+        await window.stsen.logout();
+        updateStatus();
+      }
+    });
+    window.stsen.onAccountStatusChanged(() => {
+      updateStatus();
+    });
+    updateStatus();
+  }
+}
+
 /*
  Copyright (c) 2017-2018 amano <amano@miku39.jp>
 
@@ -314,6 +356,7 @@ window.addEventListener( 'load', async function( ev ){
     }
 
     LoadOptions();
+    initAccountSettings();
 
     $( '#btn-test-talk' ).on( 'click', ( ev ) => {
         let text = $( '#webspeech-test-text' ).val();

@@ -1998,6 +1998,137 @@ var NicoLiveHelper = {
     },
 
 
+        /**
+     * STSen アカウント管理 & 手動枠接続 UI の初期化
+     */
+    initSTSenAccountUI: function(){
+        console.log('[STSen] Initializing Account & Manual Connect UI...');
+
+        const updateAccountUI = async () => {
+            if (typeof window.stsen !== 'undefined' && window.stsen.getAccountStatus) {
+                try {
+                    const status = await window.stsen.getAccountStatus();
+                    console.log('[STSen] Account status received:', status);
+                    if (status && status.loggedIn) {
+                        const name = (status.user && status.user.nickname) || 'ログイン中';
+                        const id = (status.user && status.user.id) ? 'ID: ' + status.user.id : '';
+                        $('#btn-account-login').hide();
+                        $('#account-badge').show();
+                        $('#account-nickname').text(name);
+                        if (id) {
+                            $('#account-user-id').text(id).show();
+                        } else {
+                            $('#account-user-id').hide();
+                        }
+                    } else {
+                        $('#account-badge').hide();
+                        $('#btn-account-login').show();
+                    }
+                } catch (e) {
+                    console.error('[STSen] Failed to update account UI:', e);
+                }
+            } else {
+                console.warn('[STSen] window.stsen is not available');
+            }
+        };
+
+        $(document).on('click', '#btn-account-login', function(e){
+            e.preventDefault();
+            console.log('[STSen] Login button clicked');
+            if (window.stsen && window.stsen.openLoginWindow) {
+                window.stsen.openLoginWindow();
+            }
+        });
+
+        
+        $(document).on('click', '#menu-input-session', async function(e){
+            e.preventDefault();
+            const promptMsg = '普段お使いのブラウザ（Chrome/Edge等）でニコニコにログイン後、Cookieの「user_session」の値を入力してください：\n（例: user_session_12345678_...）';
+            const res = await ShowPromptDialog(promptMsg, '');
+            if (res && res.trim()) {
+                if (window.stsen && window.stsen.setUserSession) {
+                    const result = await window.stsen.setUserSession(res.trim());
+                    if (result.success) {
+                        alert('ログインに成功しました！（' + ((result.user && result.user.nickname) || '認証完了') + '）');
+                        location.reload();
+                    } else {
+                        alert('セッションの認証に失敗しました。値をご確認ください。');
+                    }
+                }
+            }
+        });
+
+        $(document).on('click', '#menu-login', function(e){
+            e.preventDefault();
+            console.log('[STSen] Menu login clicked');
+            if (window.stsen && window.stsen.openLoginWindow) {
+                window.stsen.openLoginWindow();
+            }
+        });
+
+        $(document).on('click', '#btn-account-relogin', function(e){
+            e.preventDefault();
+            console.log('[STSen] Re-login clicked');
+            if (window.stsen && window.stsen.openLoginWindow) {
+                window.stsen.openLoginWindow();
+            }
+        });
+
+        $(document).on('click', '#btn-account-logout', async function(e){
+            e.preventDefault();
+            if (confirm('ニコニコからログアウトしますか？')) {
+                if (window.stsen && window.stsen.logout) {
+                    await window.stsen.logout();
+                }
+                location.reload();
+            }
+        });
+
+        $(document).on('click', '#open-config-folder', function(e){
+            e.preventDefault();
+            if (window.stsen && window.stsen.openConfigFolder) {
+                window.stsen.openConfigFolder();
+            }
+        });
+
+        if (typeof window.stsen !== 'undefined') {
+            if (window.stsen.onAccountStatusChanged) {
+                window.stsen.onAccountStatusChanged((status) => {
+                    console.log('[STSen] Account status changed event:', status);
+                    updateAccountUI();
+                    if (status && status.loggedIn && typeof NicoLiveMylist !== 'undefined') {
+                        try { NicoLiveMylist.loadMylist(); } catch (e) {}
+                    }
+                });
+            }
+
+            const currentLv = GetParameterByName('lv');
+            if (currentLv) {
+                $('#input-manual-lvid').val(currentLv);
+            }
+            const doConnectManual = () => {
+                let val = $('#input-manual-lvid').val().trim();
+                if (!val) return;
+                const m = val.match(/lv\d+/) || val.match(/\d+/);
+                if (m) {
+                    const targetId = m[0].startsWith('lv') ? m[0] : 'lv' + m[0];
+                    window.location.href = 'main.html?lv=' + targetId;
+                } else {
+                    alert('有効な配信ID（例: lv12345678）を入力してください。');
+                }
+            };
+
+            $(document).on('click', '#btn-manual-connect', doConnectManual);
+            $(document).on('keypress', '#input-manual-lvid', function(e){
+                if (e.which === 13) {
+                    doConnectManual();
+                }
+            });
+
+            updateAccountUI();
+        }
+    },
+
     initUI: async function(){
         $( '#btn-play-next' ).on( 'click', ( ev ) => {
             // 次を再生
@@ -2310,6 +2441,7 @@ var NicoLiveHelper = {
         NicoLiveHistory.init();
         UserManage.init();
         NicoLiveTagSearch.init();
+        this.initSTSenAccountUI();
 
         if( lvid ){
             // 放送IDが渡されたら放送に接続する

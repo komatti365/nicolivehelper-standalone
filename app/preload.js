@@ -35,69 +35,24 @@ const storageChangeListeners = new Set();
 const runtimeMessageListeners = new Set();
 
 // -------------------------------------------------------------
-// storage.local (localStorage バックエンド)
-// -------------------------------------------------------------
-const storageLocal = {
-  get: async (keys) => {
-    const result = {};
-    if (keys === null || keys === undefined) {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        try {
-          result[k] = JSON.parse(localStorage.getItem(k));
-        } catch {
-          result[k] = localStorage.getItem(k);
-        }
-      }
-      return result;
+// storage.local (メインプロセス storage.json バックエンド)
+  const storageLocal = {
+    get: async (keys) => {
+      return await ipcRenderer.invoke('storage-get', keys);
+    },
+    set: async (items) => {
+      return await ipcRenderer.invoke('storage-set', items);
+    },
+    remove: async (keys) => {
+      return await ipcRenderer.invoke('storage-remove', keys);
+    },
+    clear: async () => {
+      return await ipcRenderer.invoke('storage-clear');
     }
+  };
 
-    if (typeof keys === 'string') keys = [keys];
-
-    if (Array.isArray(keys)) {
-      for (const k of keys) {
-        const val = localStorage.getItem(k);
-        if (val !== null) {
-          try {
-            result[k] = JSON.parse(val);
-          } catch {
-            result[k] = val;
-          }
-        }
-      }
-    } else if (typeof keys === 'object') {
-      for (const k in keys) {
-        const val = localStorage.getItem(k);
-        if (val !== null) {
-          try {
-            result[k] = JSON.parse(val);
-          } catch {
-            result[k] = val;
-          }
-        } else {
-          result[k] = keys[k];
-        }
-      }
-    }
-    return result;
-  },
-
-  set: async (items) => {
-    const changes = {};
-    for (const [k, v] of Object.entries(items)) {
-      const oldValRaw = localStorage.getItem(k);
-      let oldValue = undefined;
-      if (oldValRaw !== null) {
-        try {
-          oldValue = JSON.parse(oldValRaw);
-        } catch {
-          oldValue = oldValRaw;
-        }
-      }
-      localStorage.setItem(k, JSON.stringify(v));
-      changes[k] = { oldValue, newValue: v };
-    }
-
+  // メインプロセスからの設定変更を受信してリスナーを実行
+  ipcRenderer.on('storage-changed', (event, changes) => {
     for (const listener of storageChangeListeners) {
       try {
         listener(changes, 'local');
@@ -105,15 +60,7 @@ const storageLocal = {
         console.error('storage.onChanged error:', err);
       }
     }
-  },
-
-  remove: async (keys) => {
-    if (typeof keys === 'string') keys = [keys];
-    for (const k of keys) localStorage.removeItem(k);
-  },
-
-  clear: async () => localStorage.clear()
-};
+  });
 
 // -------------------------------------------------------------
 // window.browser ポリフィル本体
@@ -288,3 +235,19 @@ ipcRenderer.on('from-extension', (event, data) => {
 });
 
 console.log('[Preload] Polyfill successfully injected. Initial URL:', window.location.href);
+// STSen 専用 API (内蔵ブラウザログイン / 枠手動接続 / アカウント管理)
+window.stsen = {
+  openLoginWindow: () => ipcRenderer.invoke('open-login-window'),
+  logout: () => ipcRenderer.invoke('logout'),
+  setUserSession: (val) => ipcRenderer.invoke('set-user-session', val),
+  getAccountStatus: () => ipcRenderer.invoke('get-account-status'),
+  loadLive: (lvid) => ipcRenderer.invoke('load-live', lvid),
+  openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
+  onAccountStatusChanged: (callback) => {
+    ipcRenderer.on('account-status-changed', (event, data) => callback(data));
+  }
+};
+
+ipcRenderer.on('account-status-changed', (event, data) => {
+  window.dispatchEvent(new CustomEvent('stsen-account-status-changed', { detail: data }));
+});
