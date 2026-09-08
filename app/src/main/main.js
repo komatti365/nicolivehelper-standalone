@@ -2199,6 +2199,23 @@ var NicoLiveHelper = {
             }
         });
 
+        const showAbout = function(e) {
+            if (e) e.preventDefault();
+            if (window.stsen && window.stsen.showAboutDialog) {
+                window.stsen.showAboutDialog();
+            } else if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.getManifest) {
+                const manifest = browser.runtime.getManifest();
+                alert(`${manifest.name || 'New NicoLive Helper'}\nバージョン: v${manifest.version}`);
+            }
+        };
+        $(document).on('click', '#open-about', showAbout);
+        $(document).on('click', '#app-version-badge', showAbout);
+
+        if (window.stsen && window.stsen.getVersion) {
+            const v = window.stsen.getVersion();
+            $('.app-version-text').text(v.startsWith('v') ? v : 'v' + v);
+        }
+
         if (typeof window.stsen !== 'undefined') {
             if (window.stsen.onAccountStatusChanged) {
                 window.stsen.onAccountStatusChanged((status) => {

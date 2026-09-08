@@ -21,9 +21,14 @@
   <script src="options.js"></script>
 </head>
 <body>
-<div class="options-top-bar">
-  <button id="btn-save-config">設定を保存</button>
-  <button id="btn-open-config-folder" type="button" style="margin-left: 10px; cursor: pointer; padding: 2px 10px; background: #6c757d; color: #fff; border: 1px solid #6c757d; border-radius: 3px;">📁 設定フォルダを開く</button>
+<div class="options-top-bar" style="display: flex; align-items: center; justify-content: space-between;">
+  <div>
+    <button id="btn-save-config">設定を保存</button>
+    <button id="btn-open-config-folder" type="button" style="margin-left: 10px; cursor: pointer; padding: 2px 10px; background: #6c757d; color: #fff; border: 1px solid #6c757d; border-radius: 3px;">📁 設定フォルダを開く</button>
+  </div>
+  <div>
+    <span id="opt-version-badge" style="cursor: pointer; font-size: 11px; color: #495057; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 3px 8px; user-select: none;" title="クリックで詳細バージョン情報を表示">バージョン: <strong class="app-version-text">v99.99.99</strong></span>
+  </div>
 </div>
 
 <div class="options-container">

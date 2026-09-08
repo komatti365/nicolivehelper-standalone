@@ -23,6 +23,13 @@ try {
 
 const { ipcRenderer } = require('electron');
 
+let appVersion = '99.99.99';
+try {
+  appVersion = ipcRenderer.sendSync('get-app-version-sync') || '99.99.99';
+} catch (e) {
+  console.warn('[Preload] Failed to get app version synchronously:', e);
+}
+
 console.log('[Preload] Initializing browser API polyfill in renderer...');
 
 // window.prompt ポリフィル
@@ -72,7 +79,7 @@ window.browser = {
       return {
         id: 'stsen-app',
         name: 'New NicoLive Helper',
-        version: '1.0.0',
+        version: appVersion,
         installType: 'development',
         type: 'extension'
       };
@@ -172,7 +179,7 @@ window.browser = {
   runtime: {
     getManifest: () => ({
       name: 'New NicoLive Helper',
-      version: '1.0.0'
+      version: appVersion
     }),
     sendMessage: async (message) => {
       console.log('[Preload:runtime.sendMessage]', message);
@@ -244,6 +251,9 @@ window.stsen = {
   loadLive: (lvid) => ipcRenderer.invoke('load-live', lvid),
   detectCurrentLive: () => ipcRenderer.invoke('detect-current-live'),
   openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
+  getVersion: () => appVersion,
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),
   onAccountStatusChanged: (callback) => {
     ipcRenderer.on('account-status-changed', (event, data) => callback(data));
   }

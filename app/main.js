@@ -642,7 +642,7 @@ function createOrFocusMainWindow(lvid = '') {
     height: 640,
     minWidth: 600,
     minHeight: 400,
-    title: 'New NicoLive Helper (STSen)',
+    title: `New NicoLive Helper (STSen) v${app.getVersion()}`,
     icon: path.join(__dirname, 'src', 'icons', 'icon-96.png'),
     webPreferences: getWebPreferences()
   });
@@ -1101,6 +1101,26 @@ ipcMain.handle('open-external', (event, url) => {
 
 ipcMain.handle('detect-current-live', async () => {
   return await fetchMyCurrentLiveInfo();
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.on('get-app-version-sync', (event) => {
+  event.returnValue = app.getVersion();
+});
+
+ipcMain.handle('show-about-dialog', async () => {
+  const version = app.getVersion();
+  const focusedWin = BrowserWindow.getFocusedWindow() || mainWindow;
+  await dialog.showMessageBox(focusedWin || null, {
+    type: 'info',
+    title: 'バージョン情報',
+    message: `NicoLive Helper Standalone (STSen)`,
+    detail: `バージョン: v${version}\nElectron: ${process.versions.electron}\nChromium: ${process.versions.chrome}\nNode.js: ${process.versions.node}\nUserData: ${CONFIG_DIR}`,
+    buttons: ['OK']
+  });
 });
 
 // アプリ起動フロー

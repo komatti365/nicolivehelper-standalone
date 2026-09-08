@@ -414,4 +414,24 @@ window.addEventListener( 'load', async function( ev ){
     $( '#btn-save-config' ).on( 'click', ( ev ) => {
         SaveOptions( ev );
     } );
+
+    $( '#btn-open-config-folder' ).on( 'click', () => {
+        if ( window.stsen && window.stsen.openConfigFolder ) {
+            window.stsen.openConfigFolder();
+        }
+    } );
+
+    $( '#opt-version-badge' ).on( 'click', () => {
+        if ( window.stsen && window.stsen.showAboutDialog ) {
+            window.stsen.showAboutDialog();
+        } else if ( typeof browser !== 'undefined' && browser.runtime && browser.runtime.getManifest ) {
+            const manifest = browser.runtime.getManifest();
+            alert( `${manifest.name || 'New NicoLive Helper'}\nバージョン: v${manifest.version}` );
+        }
+    } );
+
+    if ( typeof window.stsen !== 'undefined' && window.stsen.getVersion ) {
+        const v = window.stsen.getVersion();
+        $( '.app-version-text' ).text( v.startsWith('v') ? v : 'v' + v );
+    }
 } );
