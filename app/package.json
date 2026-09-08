@@ -1,7 +1,7 @@
 {
   "name": "nicolivehelper-standalone",
   "productName": "NicoLive Helper Standalone",
-  "version": "1.0.0",
+  "version": "99.99.99",
   "description": "NicoLive Helper Standalone Desktop Application",
   "main": "main.js",
   "author": "amano / komatti365",
@@ -40,14 +40,16 @@
           ]
         }
       ],
-      "icon": "src/icons/icon-256.png"
+      "icon": "src/icons/icon-256.png",
+      "artifactName": "NicoLiveHelper-Standalone-v${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NicoLive Helper Standalone"
+      "shortcutName": "NicoLive Helper Standalone",
+      "artifactName": "NicoLiveHelper-Standalone-v${version}-Setup.${ext}"
     },
     "files": [
       "main.js",
