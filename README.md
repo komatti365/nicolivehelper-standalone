@@ -89,6 +89,7 @@ nicolivehelper-standalone/
 
 ## 謝辞
 amano様、New NicoLive Helperのオリジナル版を開発しています
+
 ドワンゴ様、ニコニコ動画のプラットフォームとAPIを提供していただき、ありがとうございます。
 
 
