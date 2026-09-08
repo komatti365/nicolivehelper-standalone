@@ -55,6 +55,15 @@
       "src/**/*",
       "node_modules/**/*",
       "package.json"
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "komatti365",
+      "repo": "nicolivehelper-standalone"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/komatti365/nicolivehelper-standalone.git"
   }
 }
