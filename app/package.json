@@ -1,8 +1,8 @@
 {
-  "name": "new-nicolive-helper",
-  "productName": "New NicoLive Helper",
+  "name": "nicolivehelper-standalone",
+  "productName": "NicoLive Helper Standalone",
   "version": "1.0.0",
-  "description": "New NicoLive Helper Desktop Application",
+  "description": "NicoLive Helper Standalone Desktop Application",
   "main": "main.js",
   "author": "amano / komatti365",
   "license": "MIT",
@@ -20,8 +20,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.komatti365.nicolivehelper",
-    "productName": "New NicoLive Helper",
+    "appId": "com.komatti365.nicolivehelper.standalone",
+    "productName": "NicoLive Helper Standalone",
     "directories": {
       "output": "dist"
     },
@@ -47,7 +47,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "New NicoLive Helper"
+      "shortcutName": "NicoLive Helper Standalone"
     },
     "files": [
       "main.js",

@@ -17,9 +17,22 @@ if (!gotTheLock) {
 // -------------------------------------------------------------
 // AppData 専用ディレクトリの設定
 // -------------------------------------------------------------
-const CONFIG_DIR = path.join(app.getPath('appData'), 'STSen-NicoLiveHelper');
+const CONFIG_DIR = path.join(app.getPath('appData'), 'nicolivehelper-standalone');
+const PREV_CONFIG_DIR = path.join(app.getPath('appData'), 'STSen-NicoLiveHelper');
 if (!fs.existsSync(CONFIG_DIR)) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  // 旧 STSen-NicoLiveHelper からのデータ移行
+  if (fs.existsSync(PREV_CONFIG_DIR)) {
+    try {
+      const prevCookies = path.join(PREV_CONFIG_DIR, 'cookies.json');
+      const prevStorage = path.join(PREV_CONFIG_DIR, 'storage.json');
+      if (fs.existsSync(prevCookies)) fs.copyFileSync(prevCookies, path.join(CONFIG_DIR, 'cookies.json'));
+      if (fs.existsSync(prevStorage)) fs.copyFileSync(prevStorage, path.join(CONFIG_DIR, 'storage.json'));
+      console.log('[STSen] Migrated config from previous STSen-NicoLiveHelper directory.');
+    } catch (e) {
+      console.error('[STSen] Failed to migrate previous config:', e);
+    }
+  }
 }
 app.setPath('userData', CONFIG_DIR);
 console.log('[STSen] Config & UserData directory:', CONFIG_DIR);

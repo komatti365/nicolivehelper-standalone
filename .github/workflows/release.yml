@@ -71,7 +71,7 @@ jobs:
       - name: Upload Build Artifacts (Actions)
         uses: actions/upload-artifact@v4
         with:
-          name: new-nicolive-helper-windows
+          name: nicolivehelper-standalone-windows
           path: |
             app/dist/*.exe
             app/dist/*.zip
