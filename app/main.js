@@ -371,6 +371,61 @@ async function fetchLiveInfoDirect(lvid) {
 }
 
 // -------------------------------------------------------------
+// ログイン中ユーザーの現在放送中（ON_AIR）の配信を自動検出
+// -------------------------------------------------------------
+async function fetchMyCurrentLiveInfo() {
+  const account = await getAccountStatus();
+  if (!account || !account.loggedIn || !account.user || !account.user.id) {
+    console.log('[STSen] User is not logged in. Skipping auto-detect live.');
+    return null;
+  }
+
+  const userId = account.user.id;
+  console.log(`[STSen] Checking active live for user ${userId} (${account.user.nickname})...`);
+  try {
+    const url = `https://live.nicovideo.jp/watch/user/${userId}`;
+    const cookieHeader = cachedCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const res = await fetch(url, {
+      headers: {
+        'Cookie': cookieHeader,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!res.ok) {
+      console.warn(`[STSen] Fetch user live page returned HTTP ${res.status}`);
+      return null;
+    }
+
+    const html = await res.text();
+    const m = html.match(/id=["']embedded-data["'][^>]*data-props=["'](.*?)["']/s) ||
+              html.match(/<script id=["']embedded-data["'][^>]*>(.*?)<\/script>/s);
+    if (m) {
+      const raw = m[1].includes('&quot;') ? m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : m[1];
+      const liveinfo = JSON.parse(raw);
+      if (liveinfo.program && liveinfo.program.status === 'ON_AIR') {
+        let lvid = liveinfo.program.nicoliveProgramId;
+        if (!lvid && liveinfo.program.watchPageUrl) {
+          const matchLv = liveinfo.program.watchPageUrl.match(/lv\d+/);
+          if (matchLv) lvid = matchLv[0];
+        }
+        if (lvid) {
+          console.log(`[STSen] Active live detected: ${lvid} - "${liveinfo.program.title}"`);
+          latestLvid = lvid;
+          liveProp[lvid] = liveinfo;
+          return { lvid, liveinfo };
+        }
+      } else {
+        console.log('[STSen] No active live currently ON_AIR for this user.');
+      }
+    }
+  } catch (err) {
+    console.error('[STSen] Error detecting current live:', err);
+  }
+  return null;
+}
+
+// -------------------------------------------------------------
 // HTTP リクエストヘッダーのインターセプト（Cookie 強制注入）
 // -------------------------------------------------------------
 function setupRequestHeaderInterceptor() {
@@ -1044,6 +1099,10 @@ ipcMain.handle('open-external', (event, url) => {
   shell.openExternal(url);
 });
 
+ipcMain.handle('detect-current-live', async () => {
+  return await fetchMyCurrentLiveInfo();
+});
+
 // アプリ起動フロー
 app.whenReady().then(async () => {
   console.log('[STSen] App is ready.');
@@ -1052,7 +1111,25 @@ app.whenReady().then(async () => {
   await restoreSavedCookies();
 
   initWebSocketServer();
-  createOrFocusMainWindow();
+
+  // 起動時に最新の放送中の配信に自動接続する設定をチェック
+  let initialLvid = '';
+  const storageData = loadStorageFile();
+  const config = storageData.config || {};
+  const autoConnect = config['auto-connect-on-start'] !== false;
+  if (autoConnect) {
+    try {
+      const detected = await fetchMyCurrentLiveInfo();
+      if (detected && detected.lvid) {
+        initialLvid = detected.lvid;
+        console.log(`[STSen] Auto-connecting to current active live on startup: ${initialLvid}`);
+      }
+    } catch (e) {
+      console.warn('[STSen] Failed to auto-detect live on startup:', e);
+    }
+  }
+
+  createOrFocusMainWindow(initialLvid);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

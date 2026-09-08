@@ -120,8 +120,21 @@ var NicoLiveRequest = {
             vinfo.is_self_request = q.is_self_request;
             vinfo.comment_no = q.comment_no;
             vinfo.request_user_id = q.user_id;
+            vinfo.request_user_name = q.user_name || "";
             vinfo.is_self_request = q.is_self_request;
             vinfo.rights_code = q.code;
+
+            if( !vinfo.request_user_name ){
+                if( vinfo.request_user_id === "0" ){
+                    vinfo.request_user_name = NicoLiveHelper.getBroadcasterName ? NicoLiveHelper.getBroadcasterName() : Config['request-broadcaster-name'] || "放送者";
+                }else if( vinfo.request_user_id.match(/^\d+$/) ){
+                    try{
+                        vinfo.request_user_name = await NicoLiveComment.getProfileName( vinfo.request_user_id, vinfo.request_user_id );
+                    }catch( e ){
+                        vinfo.request_user_name = vinfo.request_user_id;
+                    }
+                }
+            }
 
             if( !vinfo.no_live_play ){
                 // コンテンツが存在しないか、権限がないため引用できませんでした。
@@ -155,6 +168,10 @@ var NicoLiveRequest = {
             switch( code ){
             case 0: // OK
                 this.sendReply( 'request-accept', vinfo );
+                if( typeof Discord !== 'undefined' && Config['discord-on-request'] && Discord.webhookUrl ){
+                    let str = NicoLiveHelper.replaceMacros( Config['discord-request-text'], vinfo );
+                    Discord.updateStatus( str );
+                }
                 break;
             case 1: // 引用不可
                 this.sendReply( 'request-no-live-play', vinfo );
@@ -221,10 +238,14 @@ var NicoLiveRequest = {
                 $( elem ).text( '' );
             }
 
-            if( item.request_user_id && item.request_user_id !== '0' ){
-                row.querySelector( '.request-user' ).textContent = item.request_user_id;
+            if( (item.request_user_id && item.request_user_id !== '0') || item.request_user_name ){
+                let requestUserText = item.request_user_name || item.request_user_id || "";
+                if( !item.request_user_name && item.request_user_id && !item.request_user_id.match(/^\d+$/) ){
+                    requestUserText = Config['request-anonymous-name'] || "匿名さん";
+                }
+                row.querySelector( '.request-user' ).textContent = requestUserText;
                 row.querySelector( '.request-counter' ).textContent = ` (${item.request_counter})`;
-                row.querySelector( '.request-user' ).setAttribute( 'title', `ID:${item.request_user_id} の ${item.request_counter}回目のリクエストです` );
+                row.querySelector( '.request-user' ).setAttribute( 'title', `ID:${item.request_user_id} ${item.request_user_name || ''} の ${item.request_counter}回目のリクエストです` );
             }
 
             // 先頭から何分後にあるかの表示
@@ -249,6 +270,10 @@ var NicoLiveRequest = {
         vinfo = JSON.parse( JSON.stringify( vinfo ) );
         vinfo.is_played = false;
 
+        if( !vinfo.request_user_name && vinfo.request_user_id === "0" ){
+            vinfo.request_user_name = Config['request-broadcaster-name'] || "放送者";
+        }
+
         this.request.push( vinfo );
 
         let elem = NicoLiveHelper.createVideoInfoElement( vinfo );
@@ -266,13 +291,14 @@ var NicoLiveRequest = {
      * @param is_self_request 自貼りフラグ
      * @param code JWID等コード
      */
-    addRequest: function( video_id, comment_no, user_id, is_self_request, code ){
+    addRequest: function( video_id, comment_no, user_id, is_self_request, code, user_name ){
         let q = {
             'video_id': video_id,
             'comment_no': comment_no,
             'user_id': user_id,
             'is_self_request': is_self_request,
-            'code': code
+            'code': code,
+            'user_name': user_name
         };
 
         let n = this._queue.length;
@@ -293,10 +319,15 @@ var NicoLiveRequest = {
         if( video_id.length < 3 ) return;
         let l = video_id.match( /(sm|nm|so)\d+|\d{10}/g );
 
+        let broadcasterName = Config['request-broadcaster-name'] || "放送者";
+        if( NicoLiveHelper.getBroadcasterName ){
+            broadcasterName = NicoLiveHelper.getBroadcasterName();
+        }
+
         for( let i = 0, id; id = l[i]; i++ ){
             // TODO テスト用にコメント番号を付けているので不要になったら削除
             let cno = 0;//parseInt( Math.random() * 1000 );
-            this.addRequest( id, cno, "0", false );
+            this.addRequest( id, cno, "0", false, "", broadcasterName );
         }
 
         $( '#input-request-video' ).val( '' );
@@ -756,7 +787,8 @@ var NicoLiveRequest = {
 
     init: async function(){
         this.initUI();
-        this.loadRequests();
+        await this.loadRequests();
         this.loadNGVideo();
+        console.log( 'NicoLiveRequest.init: loaded request count', this.request.length );
     }
 };

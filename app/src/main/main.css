@@ -158,6 +158,21 @@ footer {
     overflow: scroll;
 }
 
+/* prevent header fields from overflowing when long titles are used */
+#community-id, #live-title, #live-caster {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 30%; /* allow a reasonable portion of the header width */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#live-title {
+    /* give a little more room specifically for the title */
+    max-width: 50%;
+}
+
 .my-alert {
     margin-bottom: 0px;
     padding: 0.4rem 0.4rem;

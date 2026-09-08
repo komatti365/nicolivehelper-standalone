@@ -50,6 +50,7 @@ class VideoInformation {
         this.self_request = false;      ///< 自貼り
         this.request_comment_no = 0;    ///< リクエストのコメント番号
         this.request_user_id = '';      ///< リク主のユーザーID
+        this.request_user_name = '';    ///< リク主のユーザー名
         this.rights_code = '';          ///< JWIDの作品コードなど権利関係処理用のもの
     }
 }

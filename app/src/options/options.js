@@ -166,6 +166,8 @@ async function LoadOptions(){
     LoadBool( 'startup-comment-by-community', config, Config['startup-comment-by-community'] );
     LoadBool( 'auto-extend', config, Config['auto-extend'] );
     LoadBool( 'auto-start', config, Config['auto-start'] );
+    LoadBool( 'auto-start-quote', config, Config['auto-start-quote'] );
+    LoadBool( 'auto-connect-on-start', config, Config['auto-connect-on-start'] );
     LoadBool( 'auto-open', config, Config['auto-open'] );
     LoadBool( 'auto-close', config, Config['auto-close'] );
     LoadBool( 'auto-create-next', config, Config['auto-create-next'] );
@@ -179,6 +181,8 @@ async function LoadOptions(){
     LoadValue( 'request-allow-n-min-elapsed', config, Config['request-allow-n-min-elapsed'] );
 
     LoadBool( 'request-send-reply', config, Config['request-send-reply'] );
+    LoadValue( 'request-broadcaster-name', config, Config['request-broadcaster-name'] );
+    LoadValue( 'request-anonymous-name', config, Config['request-anonymous-name'] );
     LoadValue( 'request-accept', config, Config['request-accept'] );
     LoadValue( 'request-not-allow', config, Config['request-not-allow'] );
     LoadValue( 'request-no-live-play', config, Config['request-no-live-play'] );
@@ -230,6 +234,34 @@ async function LoadOptions(){
     } );
 
 
+    /* Discord */
+    LoadBool( 'discord-on-play', config, Config['discord-on-play'] );
+    LoadValue( 'discord-text', config, Config['discord-text'] );
+    LoadBool( 'discord-on-request', config, Config['discord-on-request'] );
+    LoadValue( 'discord-request-text', config, Config['discord-request-text'] );
+    LoadValue( 'discord-webhook-url', config, '' );
+    // make sure the helper knows the current URL right away
+    if( config['discord-webhook-url'] ){
+        Discord.webhookUrl = config['discord-webhook-url'];
+    }
+
+    $( '#btn-test-discord' ).on( 'click', ( ev ) => {
+        // make sure a webhook URL has been entered before attempting to send
+        let url = $( '#discord-webhook-url' ).val().trim();
+        if( url === '' ){
+            alert( 'Discord のウェブフック URL が設定されていません。送信するには URL を入力してください。' );
+            return;
+        }
+        // update the Discord helper immediately so the test can use it
+        Discord.webhookUrl = url;
+        // also mirror it in the temporary config object so that SaveOptions will
+        // pick it up (but we don't persist here yet).
+        Config['discord-webhook-url'] = url;
+
+        let text = $( '#txt-discord-test' ).val();
+        Discord.updateStatus( text );
+    } );
+
     /* コメント読み上げ */
     LoadBool( 'do-speech', config, Config['do-speech'] );
     LoadBool( 'do-speech-caster-comment', config, Config['do-speech-caster-comment'] );
@@ -273,6 +305,8 @@ function SaveOptions( ev ){
     SaveBool( 'startup-comment-by-community', config );
     SaveBool( 'auto-extend', config );
     SaveBool( 'auto-start', config );
+    SaveBool( 'auto-start-quote', config );
+    SaveBool( 'auto-connect-on-start', config );
     SaveBool( 'auto-open', config );
     SaveBool( 'auto-close', config );
     SaveBool( 'auto-create-next', config );
@@ -286,6 +320,8 @@ function SaveOptions( ev ){
     SaveInt( 'request-allow-n-min-elapsed', config );
 
     SaveBool( 'request-send-reply', config );
+    SaveValue( 'request-broadcaster-name', config );
+    SaveValue( 'request-anonymous-name', config );
     SaveValue( 'request-accept', config );
     SaveValue( 'request-not-allow', config );
     SaveValue( 'request-no-live-play', config );
@@ -317,6 +353,13 @@ function SaveOptions( ev ){
     SaveValue( 'oauth-token', config );
     SaveValue( 'oauth-secret-token', config );
     config['twitter-screen-name'] = $( '#twitter-screen-name' ).text();
+
+    /* Discord */
+    SaveBool( 'discord-on-play', config );
+    SaveValue( 'discord-webhook-url', config );
+    SaveValue( 'discord-text', config );
+    SaveBool( 'discord-on-request', config );
+    SaveValue( 'discord-request-text', config );
 
     /* コメント読み上げ */
     SaveBool( 'do-speech', config );

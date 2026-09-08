@@ -24,6 +24,24 @@ var KeyboardShortcut = {
     init: function(){
         window.addEventListener( 'keydown', ( ev ) =>{
             // console.log( ev );
+
+            if( ev.keyCode == 84 /* T */ && ev.altKey && ev.ctrlKey ){
+                let defstring = '';
+                if( NicoLiveHelper.currentVideo ){
+                    defstring = NicoLiveHelper.replaceMacros( Config['tweet-text'], NicoLiveHelper.currentVideo );
+                }
+                let text = window.prompt( 'つぶやきを入力してください', defstring );
+                if( text ){
+                    if( typeof Twitter !== 'undefined' ){
+                        Twitter.updateStatus( text );
+                    }
+                    if( typeof Discord !== 'undefined' && Config['discord-on-play'] && Discord.webhookUrl ){
+                        Discord.updateStatus( text );
+                    }
+                }
+                ev.stopPropagation();
+                ev.preventDefault();
+            }
         } );
     }
 };

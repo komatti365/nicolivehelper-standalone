@@ -289,6 +289,32 @@ var NicoLiveHelper = {
         }
     },
 
+    saveActivePlaySession: function( data ){
+        try {
+            localStorage.setItem( 'nicolivehelper_active_play_session', JSON.stringify( data ) );
+        } catch( e ){
+            console.warn( 'Failed to save active play session:', e );
+        }
+    },
+
+    getActivePlaySession: function(){
+        try {
+            let item = localStorage.getItem( 'nicolivehelper_active_play_session' );
+            return item ? JSON.parse( item ) : null;
+        } catch( e ){
+            console.warn( 'Failed to get active play session:', e );
+            return null;
+        }
+    },
+
+    clearActivePlaySession: function(){
+        try {
+            localStorage.removeItem( 'nicolivehelper_active_play_session' );
+        } catch( e ){
+            console.warn( 'Failed to clear active play session:', e );
+        }
+    },
+
     /**
      * 動画再生を停止する.
      * @returns {Promise<any>}
@@ -318,6 +344,7 @@ var NicoLiveHelper = {
                     return;
                 }
                 this.currentVideo = null;
+                this.clearActivePlaySession();
                 this.setProgressMain( 0 );
                 this.setAutoplayIndicator( false );
                 clearTimeout( this._autoplay_timer );
@@ -435,12 +462,25 @@ var NicoLiveHelper = {
                     this.currentVideo.play_begin = now;
                     this.currentVideo.play_end = now + parseInt( this.currentVideo.length_ms / 1000 );
 
+                    this.saveActivePlaySession({
+                        live_id: this.getLiveId(),
+                        video_id: vinfo.video_id,
+                        title: vinfo.title,
+                        length_ms: this.currentVideo.length_ms,
+                        play_begin: this.currentVideo.play_begin,
+                        play_end: this.currentVideo.play_end
+                    });
+
                     let next = parseInt( this.currentVideo.length_ms / 1000 + Config['autoplay-interval'] );
                     this.setNextPlayTimer( next );
 
                     if( Config['tweet-on-play'] && typeof Twitter !== 'undefined' ){
                         let str = this.replaceMacros( Config['tweet-text'], this.currentVideo );
                         Twitter.updateStatus( str );
+                    }
+                    if( typeof Discord !== 'undefined' && Config['discord-on-play'] && Discord.webhookUrl ){
+                        let str = this.replaceMacros( Config['discord-text'], this.currentVideo );
+                        Discord.updateStatus( str );
                     }
                 }
                 resolve( true );
@@ -559,6 +599,51 @@ var NicoLiveHelper = {
     },
 
     /**
+     * 自動引用再生を開始する。
+     */
+    autoStartQuote: async function(){
+        console.log( 'autoStartQuote: start', {
+            enabled: Config['auto-start-quote'],
+            isCaster: this.isCaster(),
+            requestCount: NicoLiveRequest.request.length,
+            stockCount: NicoLiveStock.stock.length
+        } );
+        if( !Config['auto-start-quote'] ){
+            console.log( 'autoStartQuote: disabled by config' );
+            return;
+        }
+        if( !this.isCaster() ){
+            console.log( 'autoStartQuote: canceled because not caster' );
+            return;
+        }
+
+        try{
+            let current = await HttpGet( `${this.endpointUrl}/v1/tools/live/contents/${this.getLiveId()}/quotation` );
+            console.log( 'autoStartQuote: current quote status', current );
+            if( current.status !== 404 ){
+                // 500などのサーバーエラーの場合は再試行をスキップ
+                if( current.status >= 500 ){
+                    console.log( 'autoStartQuote: server error, skipping auto start', current.status );
+                    return;
+                }
+                console.log( 'autoStartQuote: quote already active or returned unexpected status', current.status );
+                return;
+            }
+        }catch( e ){
+            console.log( 'autoStartQuote: failed to get current quote status', e );
+            return;
+        }
+
+        if( NicoLiveRequest.request.length === 0 && NicoLiveStock.stock.length === 0 ){
+            console.log( 'autoStartQuote: no queued request or stock video available' );
+            return;
+        }
+
+        console.log( 'autoStartQuote: invoking playNext' );
+        this.playNext();
+    },
+
+    /**
      * プログレスバーの表示を初期状態にする.
      * @returns {Promise<void>}
      */
@@ -566,14 +651,36 @@ var NicoLiveHelper = {
         let video_id = await this.getCurrentVideo();
         console.log( `Current video: ${video_id}` );
         if( !video_id ){
+            this.clearActivePlaySession();
             return;
         }
 
         let vinfo = await this.getVideoInfo( video_id );
         this.currentVideo = vinfo;
-        this.currentVideo.play_begin = GetCurrentTime();
-        this.currentVideo.play_end = GetCurrentTime();
+
+        let now = GetCurrentTime();
+        let session = this.getActivePlaySession();
+
+        // 直前にアプリで再生しており、同じ配信枠かつ同じ動画で、まだ終了予定時刻を過ぎていない場合は正確な再生時間を復元
+        if( session && session.live_id === this.getLiveId() && session.video_id === video_id && now < session.play_end ){
+            console.log( '[STSen] Restored active play session from storage:', session );
+            this.currentVideo.play_begin = session.play_begin;
+            this.currentVideo.play_end = session.play_end;
+
+            // 残り時間に合わせて次の動画の自動再生タイマーを再スケジュール
+            let remainingSec = session.play_end - now;
+            let next = parseInt( remainingSec + (Config['autoplay-interval'] || 10) );
+            if( next > 0 ){
+                this.setNextPlayTimer( next );
+            }
+        } else {
+            // 保存セッションがない場合は現在の時刻を開始とし、動画の長さから終了予定時刻を設定
+            this.currentVideo.play_begin = now;
+            this.currentVideo.play_end = now + parseInt( (vinfo.length_ms || 0) / 1000 );
+        }
+
         $( '#remaining-time-main' ).text( vinfo.title );
+        this.updateVideoProgress( now );
     },
 
 
@@ -1040,7 +1147,7 @@ var NicoLiveHelper = {
             }
 
             if( this.getRequestAllowedStatus() == 0 ){
-                NicoLiveRequest.addRequest( video_id, chat.comment_no, chat.user_id, is_self_request, code );
+                NicoLiveRequest.addRequest( video_id, chat.comment_no, chat.user_id, is_self_request, code, chat.name );
             }else{
                 NicoLiveRequest.sendReply( 'request-not-allow',
                     {video_id: video_id, comment_no: chat.comment_no} );
@@ -1498,6 +1605,7 @@ var NicoLiveHelper = {
             }else{
                 if( error.meta.status == 200 ){
                     this.showAlert( '放送を開始しました' );
+                    await this.autoStartQuote();
                 }else{
                     this.showAlert( `放送開始エラー: ${error.meta.errorCode}` );
                 }
@@ -2125,6 +2233,30 @@ var NicoLiveHelper = {
                 }
             });
 
+            $(document).on('click', '#btn-auto-detect-live', async function(e){
+                e.preventDefault();
+                const $btn = $(this);
+                const originalText = $btn.html();
+                $btn.prop('disabled', true).html('⏳ 検出中...');
+
+                try {
+                    if (window.stsen && window.stsen.detectCurrentLive) {
+                        const res = await window.stsen.detectCurrentLive();
+                        if (res && res.lvid) {
+                            console.log('[STSen] Detected live:', res.lvid);
+                            window.location.href = 'main.html?lv=' + res.lvid;
+                            return;
+                        }
+                    }
+                    alert('現在放送中（ON AIR）の配信は見つかりませんでした。\nニコニコ生放送で番組を開始してから再度お試しください。');
+                } catch (err) {
+                    console.error('[STSen] Error detecting live:', err);
+                    alert('放送中の配信の検出に失敗しました: ' + err.message);
+                } finally {
+                    $btn.prop('disabled', false).html(originalText);
+                }
+            });
+
             updateAccountUI();
         }
     },
@@ -2402,6 +2534,9 @@ var NicoLiveHelper = {
                 if( typeof Twitter !== 'undefined' ){
                     Twitter.init(); // 認証トークンをConfigから読ませるために
                 }
+                if( typeof Discord !== 'undefined' ){
+                    Discord.init(); // webhook URLをConfigから読み込む
+                }
                 NicoLiveRequest.loadNGVideo();
                 this.updatePNameWhitelist();
             }
@@ -2434,9 +2569,12 @@ var NicoLiveHelper = {
         if( typeof Twitter !== 'undefined' ){
             Twitter.init();
         }
+        if( typeof Discord !== 'undefined' ){
+            Discord.init();
+        }
         NicoLiveMylist.init();
-        NicoLiveRequest.init();
-        NicoLiveStock.init();
+        await NicoLiveRequest.init();
+        await NicoLiveStock.init();
         NicoLiveComment.init();
         NicoLiveHistory.init();
         UserManage.init();
@@ -2446,7 +2584,13 @@ var NicoLiveHelper = {
         if( lvid ){
             // 放送IDが渡されたら放送に接続する
             if( this.liveProp ){
+                console.log( 'init: connecting to live' );
                 this.connectServer();
+                // WebSocket接続後、サーバー待機時間を設けてからautoStartQuoteを実行
+                setTimeout( async () => {
+                    console.log( 'init: invoking autoStartQuote with delay' );
+                    await this.autoStartQuote();
+                }, 2000 );
             }
 
             if( this.liveProp.program.providerType === 'official' ){

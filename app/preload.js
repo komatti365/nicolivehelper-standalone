@@ -1,4 +1,4 @@
-﻿// -------------------------------------------------------------
+// -------------------------------------------------------------
 // XHR フック (withCredentials 自動有効化 & unsafe header エラー防止)
 // -------------------------------------------------------------
 try {
@@ -242,6 +242,7 @@ window.stsen = {
   setUserSession: (val) => ipcRenderer.invoke('set-user-session', val),
   getAccountStatus: () => ipcRenderer.invoke('get-account-status'),
   loadLive: (lvid) => ipcRenderer.invoke('load-live', lvid),
+  detectCurrentLive: () => ipcRenderer.invoke('detect-current-live'),
   openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
   onAccountStatusChanged: (callback) => {
     ipcRenderer.on('account-status-changed', (event, data) => callback(data));

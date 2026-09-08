@@ -29,6 +29,8 @@ var Config = {
     'startup-comment-by-community': false,
     'auto-extend': false,
     'auto-start': false,
+    'auto-start-quote': false,
+    'auto-connect-on-start': true,
     'auto-open': false,
     'auto-close': false,
     'auto-create-next': false,
@@ -57,6 +59,8 @@ var Config = {
     'request-no-played': false,
     'request-allow-n-min-elapsed': 9999,
     'request-no-ngvideo': false,
+    'request-broadcaster-name': '放送者',
+    'request-anonymous-name': '匿名さん',
     'request-accept': '>>{comment_no} リクエストを受け付けました',
     'request-not-allow': '>>{comment_no} 現在リクエストを受け付けていません',
     'request-no-live-play': '>>{comment_no} 生放送で引用できない動画です',
@@ -70,6 +74,15 @@ var Config = {
     'tweet-on-play': false,
     'tweet-text': '再生中:{title} http://nico.ms/{id} #{id} http://nico.ms/{live-id}',
     'twitter-screen-name': 'なし',
+
+    /* Discord */
+    'discord-on-play': false,
+    'discord-webhook-url': '',
+    // Discord に送るメッセージ。オプション画面は複数行入力に対応しており、改行をそのまま送信できます。
+    // たとえば以下のように \n を入れておけば、実際には改行として扱われます。
+    'discord-text': '再生中:{title}\nhttp://nico.ms/{id} #{id} http://nico.ms/{live-id}',
+    'discord-on-request': false,
+    'discord-request-text': 'リクエスト受付:{title}\nhttp://nico.ms/{id} #{id}',
 
     'do-speech': false,
     'do-speech-caster-comment': false,

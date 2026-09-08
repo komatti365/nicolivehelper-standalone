@@ -13,6 +13,7 @@
   <script src="../libs/sha1.js"></script>
   <script src="../libs/utils.js"></script>
   <script src="../libs/webspeech.js"></script>
+  <script src="../libs/discord.js"></script>
 
   <script src="../main/cc/ccdb.js"></script>
 
@@ -20,12 +21,12 @@
   <script src="options.js"></script>
 </head>
 <body>
-<div>
+<div class="options-top-bar">
   <button id="btn-save-config">設定を保存</button>
   <button id="btn-open-config-folder" type="button" style="margin-left: 10px; cursor: pointer; padding: 2px 10px; background: #6c757d; color: #fff; border: 1px solid #6c757d; border-radius: 3px;">📁 設定フォルダを開く</button>
 </div>
 
-<div style="overflow:auto; height:480px;">
+<div class="options-container">
 
   <fieldset style="margin-bottom: 12px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;">
     <legend style="font-weight: bold; font-size: 13px;">ニコニコアカウント連携</legend>
@@ -50,6 +51,12 @@
     </div>
     <div>
       <label><input type="checkbox" id="auto-start">自動で番組開始する</label>
+    </div>
+    <div>
+      <label><input type="checkbox" id="auto-start-quote">自動で引用再生を開始する</label>
+    </div>
+    <div>
+      <label><input type="checkbox" id="auto-connect-on-start">起動時に放送中の配信へ自動接続する</label>
     </div>
     <div>
       <label><input type="checkbox" id="auto-extend">放送時に自動延長ボタンON</label>
@@ -139,6 +146,14 @@
     </div>
     短期間に連続して運営コメントを送信できないため、リクエスト等が殺到した場合に送信されない場合があります。<br>
     <br>
+    <div style="display:flex; width:100%; margin-bottom:0.5em;">
+      <div class="label">手動追加リクエストの表示名</div>
+      <input id="request-broadcaster-name" type="text" style="flex:1;" placeholder="放送者">
+    </div>
+    <div style="display:flex; width:100%; margin-bottom:0.5em;">
+      <div class="label">IDのみのリクエストの表示名</div>
+      <input id="request-anonymous-name" type="text" style="flex:1;" placeholder="匿名さん">
+    </div>
     <div style="display:flex; width:100%;">
       <div class="label">リクエスト受付時</div>
       <input id="request-accept" type="text" style="flex:1;" placeholder="リクエストを受け付けたとき">
@@ -226,6 +241,32 @@
     </div>
     <div>
       <input id="tweet-text" type="text" placeholder="つぶやき内容" maxlength="140" style="width:100%;">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Discord</legend>
+    <div>
+      <label for="discord-webhook-url">Webhook URL:</label>
+      <input id="discord-webhook-url" type="text" style="width:100%;" placeholder="https://discord.com/api/webhooks/...">
+    </div>
+    <div style="margin-top:0.5em;">
+      <label><input type="checkbox" id="discord-on-play">動画再生時に送信</label>
+    </div>
+    <div>
+      <!-- テキスト欄を textarea に変更し、改行を入力できるようにする -->
+      <textarea id="discord-text" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
+    </div>
+    <div style="margin-top:0.5em;">
+      <label><input type="checkbox" id="discord-on-request">リクエスト受付時に送信</label>
+    </div>
+    <div>
+      <textarea id="discord-request-text" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
+    </div>
+    <div style="margin-top:0.5em;">
+      <!-- テスト用も textarea にして改行確認ができるように -->
+      <textarea id="txt-discord-test" placeholder="テストメッセージ" style="width:80%;height:2em;resize:vertical;"></textarea>
+      <button id="btn-test-discord" type="button">送信テスト</button>
     </div>
   </fieldset>
 

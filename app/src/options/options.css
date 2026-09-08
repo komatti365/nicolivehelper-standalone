@@ -1,3 +1,28 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 10px;
+    font-family: sans-serif;
+}
+
+.options-top-bar {
+    flex-shrink: 0;
+    padding-bottom: 8px;
+}
+
+.options-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 4px;
+}
 
 .label {
     width: 16em;

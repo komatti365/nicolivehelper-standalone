@@ -21,6 +21,7 @@
 
   <script src="../libs/sha1.js"></script>
   <script src="../libs/webspeech.js"></script>
+  <script src="../libs/discord.js"></script>
 
   <link rel="stylesheet" href="main.css">
   <script src="../libs/utils.js"></script>
@@ -86,6 +87,8 @@
           <button id="btn-manual-connect" class="btn btn-outline-secondary btn-sm" type="button" style="height: 24px; font-size: 11px; padding: 0 6px;" title="配信枠に接続">接続</button>
         </div>
       </div>
+
+      <button id="btn-auto-detect-live" class="btn btn-outline-danger btn-sm" type="button" style="height: 24px; font-size: 11px; padding: 0 6px; white-space: nowrap;" title="現在放送中の配信を自動検出して接続します">🔴 自動検出</button>
 
       <div id="account-area">
         <button id="btn-account-login" type="button" class="btn btn-sm btn-primary" style="height: 24px; font-size: 11px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px;">
