@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="stylesheet" href="../../libs/external/bootstrap/glyphicons.css">
+
+  <script src="../../libs/external/jquery-3.3.1.js"></script>
+  <script src="../../libs/external/dexie/dexie.js"></script>
+
+  <script src="ccdb.js"></script>
+  <script src="continuouscomment.js"></script>
+
+  <title>連続コメント</title>
+</head>
+<body style="font-size:9pt;">
+<div>
+  <div style="margin-bottom:1em;">
+    <button id="btn-cc-send" style="width:100%;">1行送信</button>
+  </div>
+  <div>
+    <div style="width:100%;display:flex;">
+      <label>コマンド:</label><input id="multiline-command" type="text" style="flex:1;" placeholder="コマンド">
+    </div>
+  </div>
+  <div>
+    <textarea id="multiline-comment" placeholder="テキストを入力またはテキストファイルをドロップ" style="width:99%;height:10em;"></textarea>
+  </div>
+  <div>
+    <button id="save-text">名前を付けて登録</button>
+    <select id="sel-file">
+      <option value="">---</option>
+    </select>
+    <span id="remove-file" style="cursor:pointer; color:red;" class="glyphicon glyphicon-remove" title="削除"></span>
+  </div>
+</div>
+</body>
+</html>

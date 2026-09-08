@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>New NicoLive Helper Chatbot Settings</title>
+
+  <!--  <link rel="stylesheet" href="../libs/external/bootstrap/bootstrap.css">-->
+  <link rel="stylesheet" href="../libs/external/tabulator/tabulator.css">
+  <link rel="stylesheet" href="options.css">
+
+  <script src="../libs/browser-polyfill.js"></script>
+  <script src="../libs/external/jquery-3.3.1.js"></script>
+  <script src="../libs/external/tabulator/tabulator.js"></script>
+
+  <script src="../libs/utils.js"></script>
+
+
+  <script src="../main/config.js"></script>
+  <script src="chatbot_settings.js"></script>
+</head>
+<body>
+<h1>NicoLive Helper チャットボット設定</h1>
+<div>
+  指定のキーワードを含んだコメントを受信すると自動で運営コメントを返します。
+</div>
+<div style="margin-bottom: 0.5em;">
+  <button id="btn-save-config">設定を保存</button>
+  <button id="btn-add">行を追加</button>
+</div>
+<div id="opt-chatbot-table">
+</div>
+
+
+</body>
+</html>

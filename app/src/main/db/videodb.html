@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="stylesheet" href="../../libs/external/bootstrap/bootstrap.css">
+  <link rel="stylesheet" href="../../libs/external/jquery-ui-1.12.1/jquery-ui.css">
+  <link rel="stylesheet" href="../../libs/external/jquery.contextMenu.css">
+  <script src="../../libs/browser-polyfill.js"></script>
+  <script src="../../libs/external/jquery-3.3.1.js"></script>
+  <script src="../../libs/external/jquery-ui-1.12.1/jquery-ui.js"></script>
+  <script src="../../libs/external/jquery.contextMenu.js"></script>
+  <script src="../../libs/external/popper.js"></script>
+  <script src="../../libs/external/bootstrap/bootstrap.js"></script>
+  <link rel="stylesheet" href="../../libs/external/bootstrap/glyphicons.css">
+  <script src="../../libs/external/dexie/dexie.js"></script>
+
+  <script src="../../libs/utils.js"></script>
+  <script src="../../libs/nicoapi.js"></script>
+  <script src="../datastruct.js"></script>
+
+  <link rel="stylesheet" href="videodb.css">
+  <script src="initdb.js"></script>
+  <script src="videodb.js"></script>
+  <title>動画DB</title>
+</head>
+<body>
+
+<div style="display:flex; flex-direction: column; height:100%;">
+  <ul class="nav nav-tabs" id="db-tabs" role="tablist" style="margin-top:2px;">
+    <li class="nav-item">
+      <a class="nav-link active" id="tab-snapshot-link" data-toggle="tab" href="#tab-snapshot" role="tab">スナップショット検索 (API)</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" id="tab-local-link" data-toggle="tab" href="#tab-local" role="tab">動画DB検索</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" id="tab-manual-link" data-toggle="tab" href="#tab-manual" role="tab">手動追加</a>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="db-tabs-content" style="padding: 4px 0 2px 0;">
+    <!-- スナップショット検索タブ -->
+    <div class="tab-pane fade show active" id="tab-snapshot" role="tabpanel">
+      <div class="form-inline" style="display:flex; margin-bottom: 3px; gap: 4px;">
+        <input id="snapshot-query" class="form-control form-control-sm" type="text" placeholder="キーワード または タグ" style="flex:1;">
+        <select id="snapshot-targets" class="custom-select custom-select-sm">
+          <option value="tagsExact">タグ (完全一致)</option>
+          <option value="tags">タグ (部分一致)</option>
+          <option value="title,description,tags">キーワード (タイトル・説明・タグ)</option>
+        </select>
+        <select id="snapshot-sort" class="custom-select custom-select-sm">
+          <option value="-startTime">投稿日 (新しい順)</option>
+          <option value="+startTime">投稿日 (古い順)</option>
+          <option value="-viewCounter">再生数 (多い順)</option>
+          <option value="-mylistCounter">マイリスト数 (多い順)</option>
+          <option value="-commentCounter">コメント数 (多い順)</option>
+          <option value="-lengthSeconds">時間 (長い順)</option>
+          <option value="+lengthSeconds">時間 (短い順)</option>
+        </select>
+        <select id="snapshot-limit" class="custom-select custom-select-sm">
+          <option value="10">10件</option>
+          <option value="25">25件</option>
+          <option value="50">50件</option>
+          <option value="100" selected>100件</option>
+        </select>
+        <button id="btn-snapshot-search" class="btn btn-sm btn-primary">検索</button>
+      </div>
+      <div class="form-inline" style="display:flex; align-items: center; justify-content: space-between;">
+        <div class="form-check" style="padding-left:1.25rem;">
+          <input class="form-check-input" type="checkbox" id="chk-snapshot-auto-add-db">
+          <label class="form-check-label" for="chk-snapshot-auto-add-db" style="font-size:8.5pt;">
+            検索結果を自動で動画DBに追加
+          </label>
+        </div>
+        <div>
+          <button id="btn-snapshot-add-all-db" class="btn btn-sm btn-outline-success">検索結果をすべて動画DBに追加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 動画DB検索タブ -->
+    <div class="tab-pane fade" id="tab-local" role="tabpanel">
+      <div id="db-condition">
+      </div>
+
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:2px;">
+        <select id="display-num" class="custom-select custom-select-sm">
+          <option value="10">10件</option>
+          <option value="50">50件</option>
+          <option value="100">100件</option>
+          <option value="500">500件</option>
+          <option value="1000">1000件</option>
+          <option value="99999999">すべて</option>
+        </select>
+        <select id="sort-type" class="custom-select custom-select-sm">
+          <option value="6">タイトル</option>
+          <option value="3">再生時間</option>
+          <option value="0">再生数</option>
+          <option value="1">コメント数</option>
+          <option value="2">マイリスト数</option>
+          <option value="4">投稿日</option>
+        </select>
+        <select id="sort-order" class="custom-select custom-select-sm">
+          <option value="1">昇順</option>
+          <option value="-1">降順</option>
+          <option value="0">ランダム</option>
+        </select>
+        <button id="btn-search" class="btn btn-sm btn-outline-primary">検索</button>
+
+        <div class="btn-group" style="margin-right:2px;">
+          <button id="btn-save" class="btn btn-sm btn-outline-primary">検索条件を保存</button>
+          <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split"
+                  data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></button>
+          <div class="dropdown-menu">
+            <a id="btn-remove-saved-search" class="dropdown-item" href="#">
+              <span class="glyphicon glyphicon-trash"></span> 保存した検索条件を削除</a>
+          </div>
+        </div>
+
+        <select id="saved-search" class="custom-select custom-select-sm">
+          <option value="">保存された検索</option>
+        </select>
+        <button id="btn-test" style="display:none;">test</button>
+      </div>
+    </div>
+
+    <!-- 手動追加タブ -->
+    <div class="tab-pane fade" id="tab-manual" role="tabpanel">
+      <div class="form-inline" style="display:flex; gap:4px;">
+        <input id="input-video" class="form-control form-control-sm" type="text" placeholder="動画ID または mylist/xxx..."
+               style="flex:1;">
+        <button id="btn-add-db" class="btn btn-sm btn-outline-primary">追加／更新</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="db-result" style="overflow:auto;flex:1; -border: solid 1px blue;">
+    <table id="tbl-result">
+    </table>
+  </div>
+  <label id="information" style="border-top:1px solid gray; margin:0; padding:2px 4px;"></label>
+</div>
+
+
+<template id="template-db-cond">
+  <div class="cond-line" style="display:flex;">
+    <select class="search-type">
+      <option value="title">タイトル</option>
+      <option value="length_ms">時間(秒)</option>
+      <option value="view_counter">再生数</option>
+      <option value="comment_num">コメント数</option>
+      <option value="mylist_counter">マイリスト数</option>
+      <option value="tags_array">タグ</option>
+      <option value="first_retrieve">投稿日</option>
+      <option value="video_id">動画ID</option>
+      <option value="description">詳細</option>
+    </select>
+
+    <select class="search-cond">
+      <option value="include">含む</option>
+      <option value="exclude">含まない</option>
+      <option value="greater_than">以上(以後)</option>
+      <option value="equal">同じ</option>
+      <option value="less_than">以下(以前)</option>
+    </select>
+
+    <input class="search-value" type="text" style="flex:1;">
+
+    <button class="btn-add-cond">+</button>
+    <button class="btn-remove-cond">-</button>
+  </div>
+</template>
+
+<!-- 動画情報のテンプレート -->
+<template id="template-video-info">
+  <tr class="nico-video-row" draggable="true" style="border-bottom: 1px solid gray;">
+    <td>
+      <a class="open-page" target="_blank" href="">
+        <img class="video-thumbnail" src=""
+             style="width:65px;height:50px;margin-right:8px;"></a>
+    </td>
+    <td>
+      <div class="custom-control-description video-title"></div>
+      <span class="video-details"></span>
+    </td>
+  </tr>
+</template>
+
+</body>
+</html>

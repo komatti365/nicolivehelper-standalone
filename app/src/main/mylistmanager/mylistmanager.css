@@ -1,0 +1,111 @@
+@charset "UTF-8";
+
+div {
+    /*padding: 2px;*/
+    /*border: solid 1px lightskyblue;*/
+}
+
+.footer {
+    background-color: #ededef;
+    padding: 0 0.5em;
+}
+
+.left-pane {
+    float: left;
+    width: 200px;
+    height: calc(100vh - 1.5em);
+    overflow: auto;
+    position: fixed;
+    padding: 2px;
+}
+
+.right-menu {
+    padding: 2px;
+    position: fixed;
+    background-color: white;
+    color: black;
+    width: 100%;
+    z-index: 10;
+}
+
+.right-pane {
+    margin-left: 200px;
+    right: 0;
+    overflow: auto;
+    height: calc(100vh - 1.5em);
+}
+
+#videolist {
+    padding-top: 1.75em;
+}
+
+.video-deleted {
+    background-color: #808080 ! important;
+}
+
+.mylist_item_selected {
+    background-color: #a8e4ff !important;
+}
+
+.video-title {
+    padding-top: 3px;
+}
+
+.mylist-manager-checkbox {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    display: block;
+    margin: 0;
+}
+
+#folder-item-listbox {
+    cursor: default;
+}
+
+#mylist option.dragover {
+    border: 1px solid black;
+    font-weight: bold;
+}
+
+/* 今は使えない模様 */
+option:-moz-drag-over {
+    border: 1px solid black;
+    font-weight: bold;
+}
+
+.footer {
+    height: 1.5em;
+}
+
+#videolist {
+    /*border:1px solid blue;*/
+    height: 100%;
+    font-size: 9pt;
+}
+
+#videolist.dragover {
+    border: 2px dashed blue;
+}
+
+/* NicoLive Helper Advanceでのスタイル指定 */
+#folder-item-listbox > listitem.video-deleted {
+    background-color: #808080 ! important;
+}
+
+#folder-item-listbox > listitem {
+    border-bottom: 1px solid #c0c0c0;
+}
+
+#folder-item-listbox > listitem:nth-child(odd) {
+    /*    background-color: #ffffee; */
+}
+
+#folder-item-listbox > listitem:nth-child(even) {
+    /*    background-color: #eeeeff; */
+}
+
+#folder-listbox listitem:-moz-drag-over {
+    border: 1px solid black;
+    font-weight: bold;
+}

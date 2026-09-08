@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>マイリストマネージャー - New NicoLive Helper</title>
+
+  <link rel="stylesheet" href="../../libs/external/bootstrap/bootstrap.css">
+  <link rel="stylesheet" href="../../libs/external/jquery-ui-1.12.1/jquery-ui.css">
+  <link rel="stylesheet" href="../../libs/external/jquery.contextMenu.css">
+  <script src="../../libs/browser-polyfill.js"></script>
+  <script src="../../libs/external/jquery-3.3.1.js"></script>
+  <script src="../../libs/external/jquery-ui-1.12.1/jquery-ui.js"></script>
+  <script src="../../libs/external/jquery.contextMenu.js"></script>
+  <script src="../../libs/external/popper.js"></script>
+  <script src="../../libs/external/bootstrap/bootstrap.js"></script>
+  <link rel="stylesheet" href="../../libs/external/bootstrap/glyphicons.css">
+
+  <link rel="stylesheet" href="../main.css">
+  <link rel="stylesheet" href="mylistmanager.css">
+
+  <script src="../../libs/utils.js"></script>
+  <script src="../../libs/nicoapi.js"></script>
+  <script src="mylistmanager.js"></script>
+</head>
+<body>
+
+<div class="left-pane">
+  <select id="mylist" size="26" style="width:100%;">
+  </select>
+</div>
+<div class="content">
+  <div class="right-pane">
+    <div class="right-menu">
+      <select id="select-sort-order" disabled>
+        <option value="1">登録が新しい順</option>
+        <option value="0">登録が古い順</option>
+        <option value="4">タイトル昇順</option>
+        <option value="5">タイトル降順</option>
+        <option value="2">マイリストコメント昇順</option>
+        <option value="3">マイリストコメント降順</option>
+        <option value="6">投稿が新しい順</option>
+        <option value="7">投稿が古い順</option>
+        <option value="8">再生が多い順</option>
+        <option value="9">再生が少ない順</option>
+        <option value="10">コメントが新しい順</option>
+        <option value="11">コメントが古い順</option>
+        <option value="12">コメントが多い順</option>
+        <option value="13">コメントが少ない順</option>
+        <option value="14">マイリスト登録が多い順</option>
+        <option value="15">マイリスト登録が少ない順</option>
+        <option value="17">時間が短い順</option>
+      </select>
+      <span id="mylist-num">0 件</span>
+    </div>
+    <div id="videolist">
+      <table id="folder-item-listbox">
+      </table>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  <span id="message">フッター</span>
+</div>
+
+<!-- 動画情報のテンプレート -->
+<template id="template-video-info">
+  <tr class="nico-video-row" draggable="true" style="border-bottom: 1px solid gray;">
+    <td>
+      <a class="open-page" target="_blank" href="">
+        <img class="video-thumbnail" src=""
+             style="width:65px;height:50px;margin-right:8px;"></a>
+    </td>
+    <td>
+      <div class="custom-control-description video-title"></div>
+      <span class="video-details"></span>
+    </td>
+  </tr>
+</template>
+
+</body>
+</html>
