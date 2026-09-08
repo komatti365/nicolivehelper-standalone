@@ -1,0 +1,542 @@
+[
+  {
+    "name": "nicosid",
+    "value": "1786918584.99890582",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1821478584.071108
+  },
+  {
+    "name": "_yjsu_yjad",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1818454585
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "www.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820417424
+  },
+  {
+    "name": "user_session",
+    "value": "user_session_122174607_268870ad035d3f105349d0b09e8cf894556a21bb500df40ef27500e5216d9fc5",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "lax",
+    "expirationDate": 1821478600.830762
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "garage.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820417426
+  },
+  {
+    "name": "video_search_result_display_mode",
+    "value": "media",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false,
+    "sameSite": "lax",
+    "expirationDate": 1820326004
+  },
+  {
+    "name": "_tt_enable_cookie",
+    "value": "1",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822578098
+  },
+  {
+    "name": "_ttp",
+    "value": "01M06KNYXPTWJY49N0SR7D157P_.tt.1",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822578098
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "live.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820418098
+  },
+  {
+    "name": "nicolive_color_theme",
+    "value": "auto",
+    "domain": ".live.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820418097
+  },
+  {
+    "name": "dlive_bid",
+    "value": "dlive_bid_6Ko5P9k1U3nH1oZA7uIzMeMLiLrwu0NF",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823442365.70234
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "commons.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820068347
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "nicoad.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820201872
+  },
+  {
+    "name": "sess",
+    "value": "Pl_Y_N6OBHRJWT6PXVUMPe6XUvIUvyhNkQZ0uhZzCts9_YqA8rnxVQdG5yVxyLVLQbqGvQzvB_Hv9u8ElS3fZQ",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1790681461.403349
+  },
+  {
+    "name": "uname",
+    "value": "%E3%82%B9%E3%83%86%E3%82%A4%E3%83%B3",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1790681461.403674
+  },
+  {
+    "name": "uprem",
+    "value": "y",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1790681461.403784
+  },
+  {
+    "name": "uid",
+    "value": "122174607",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1790681461.403885
+  },
+  {
+    "name": "maincss",
+    "value": "%2Fnd2.css",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1791459062
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820403063
+  },
+  {
+    "name": "_ss_pp_id",
+    "value": "525458221644df40def1787270181040",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820403063
+  },
+  {
+    "name": "login",
+    "value": "t",
+    "domain": "dic.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1790681461.403572
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "ch.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1818995827
+  },
+  {
+    "name": "_ga_7T9DR0LQRG",
+    "value": "GS2.1.s1787459827$o1$g1$t1787459848$j39$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822019848.189718
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "blog.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1819156698
+  },
+  {
+    "name": "_gcl_au",
+    "value": "1.1.86046969.1787140127",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1794916127
+  },
+  {
+    "name": "ubid",
+    "value": "ee016000-9dac-486a-a762-7f15bc0ef3f2",
+    "domain": "news.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822083494.134879
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "news.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1819059495
+  },
+  {
+    "name": "_ga_M3PZ8WH47E",
+    "value": "GS2.1.s1787523494$o1$g1$t1787523605$j60$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822083605.180089
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "income.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1819881034
+  },
+  {
+    "name": "_ga_41PQHHFEEG",
+    "value": "GS2.1.s1787620698$o3$g0$t1787620701$j57$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822180701.102922
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "koken.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1819635154
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "inform.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820063863
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "creator-support.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1819543678
+  },
+  {
+    "name": "_ga",
+    "value": "GA1.3.1221761063.1786918585",
+    "domain": ".3d.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823066199.060189
+  },
+  {
+    "name": "_ly_su",
+    "value": "1786918585.a7bdb5d8-1dc2-4cb6-8ebb-761d4e5c0285",
+    "domain": "3d.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820042199
+  },
+  {
+    "name": "_ga_6W6E94D912",
+    "value": "GS2.1.s1788503368$o3$g1$t1788506220$j60$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823066220.584348
+  },
+  {
+    "name": "_ga_4X3PYNJX27",
+    "value": "GS2.2.s1788532347$o10$g0$t1788532347$j60$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823092347.079337
+  },
+  {
+    "name": "search",
+    "value": "keyword%255Bsort%255D%3DregisteredAt%26keyword%255Border%255D%3Ddesc%26tag%255Bsort%255D%3Dpersonalized%26tag%255Border%255D%3Ddesc",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "lax",
+    "expirationDate": 1791382003.297021
+  },
+  {
+    "name": "_clck",
+    "value": "7kbjd%5E2%5Eg9a%5E0%5E2419",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1820377172
+  },
+  {
+    "name": "domand_bid",
+    "value": "122174607:680eac73fa99a3af5e45add0e1b19bcfa6a89e73cbd453a5a263d2600e94a464",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "unspecified",
+    "expirationDate": 1788961947.95529
+  },
+  {
+    "name": "_gid",
+    "value": "GA1.2.402859750.1788867058",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1788953462
+  },
+  {
+    "name": "_ga",
+    "value": "GA1.1.1221761063.1786918585",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823442097.410719
+  },
+  {
+    "name": "_td",
+    "value": "b34cfefc-0955-4f24-b4b4-971ace308a45",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823427063.481002
+  },
+  {
+    "name": "_ga_HTHDQSKHSP",
+    "value": "GS2.1.s1788867058$o2$g1$t1788867079$j39$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823427079.443792
+  },
+  {
+    "name": "live_notify_show_date",
+    "value": "1788875527",
+    "domain": ".live.nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "unspecified",
+    "expirationDate": 1789480325.004052
+  },
+  {
+    "name": "nicolivehistory",
+    "value": "%5B351237178%2C351239340%2C351239097%2C351244997%2C351248737%2C351248908%2C351253675%2C351259372%2C351265656%2C350261061%2C350261030%2C351276504%2C351279953%2C351277467%2C351280542%2C351281715%2C350261045%2C351286555%2C351298553%2C351300695%2C351299287%2C351303013%2C351306538%2C351317964%2C351320847%2C351321397%2C351324117%2C351346408%2C351348818%2C351349046%5D",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "lax",
+    "expirationDate": 1791474096.832259
+  },
+  {
+    "name": "_ga_FS29H4ZGX2",
+    "value": "GS2.1.s1788880666$o102$g1$t1788881425$j58$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823441425.826785
+  },
+  {
+    "name": "_ga_5LM4HED1NJ",
+    "value": "GS2.1.s1788880666$o100$g1$t1788882097$j59$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823442097.372891
+  },
+  {
+    "name": "_ga_BQN96KXPNS",
+    "value": "GS2.1.s1788881184$o48$g1$t1788882097$j59$l0$h0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1823442097.41027
+  },
+  {
+    "name": "_clsk",
+    "value": "18kifho%5E1788882098480%5E6%5E1%5En.clarity.ms%2Fcollect",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1788968498
+  },
+  {
+    "name": "ttcsid_CFEBGABC77U6VUESBQR0",
+    "value": "1788881187151::dr1T5_C8DQzLuvikoboa.58.1788882098525.1",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822578098
+  },
+  {
+    "name": "ttcsid_CFCCOPBC77U208RT9TAG",
+    "value": "1788881187153::1fUUzQSyK2ZGLBB8VjLv.58.1788882098525.1",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822578098
+  },
+  {
+    "name": "ttcsid",
+    "value": "1788881187152::MF-sLnEt-RtaZqVh0XqX.62.1788882098525.0::1.909237.911120::487733.2.688.726::1276824.15.0",
+    "domain": ".nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "expirationDate": 1822578463
+  },
+  {
+    "name": "_dd_s",
+    "value": "isExpired=1&aid=5a41418b-789b-4658-902f-e52f9836f39b",
+    "domain": "live.nicovideo.jp",
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "strict",
+    "expirationDate": 1820419374
+  }
+]

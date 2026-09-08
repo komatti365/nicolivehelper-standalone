@@ -62,16 +62,16 @@ var NicoLiveTagSearch = {
         } );
     },
 
-    handleManualAddClick: function(){
+    handleManualAddClick: async function() {
         let tag = Config['tag-search-tag'];
-        if( !tag || tag.trim().length === 0 ){
-            let promptTag = prompt( '検索するタグを入力してください:' );
-            if( promptTag !== null && promptTag.trim().length > 0 ){
-                this.searchAndAdd( promptTag.trim(), null, false );
+        if (!tag || tag.trim().length === 0) {
+            let promptTag = await ShowPromptDialog('検索するタグを入力してください:');
+            if (promptTag !== null && promptTag.trim().length > 0) {
+                this.searchAndAdd(promptTag.trim(), null, false);
             }
             return;
         }
-        this.searchAndAdd( tag.trim(), null, false );
+        this.searchAndAdd(tag.trim(), null, false);
     },
 
     /**

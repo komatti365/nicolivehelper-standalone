@@ -23,19 +23,20 @@
   "permissions": [
     "storage",
     "tabs",
-    "contextMenus"
+    "contextMenus",
+    "cookies"
   ],
   "host_permissions": [
     "*://live.nicovideo.jp/*",
     "*://live2.nicovideo.jp/*",
     "*://com.nicovideo.jp/*",
     "*://www.nicovideo.jp/*",
+    "*://*.nicovideo.jp/*",
     "http://127.0.0.1/*",
     "ws://127.0.0.1/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

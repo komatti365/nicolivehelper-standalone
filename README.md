@@ -12,7 +12,7 @@ Manifest v3 対応に伴い、従来のブラウザ拡張機能を **ネイテ�
 STSen-Extension/
 ├── app/                  # 【デスクトップアプリ本体 (Electron)】
 │   ├── package.json
-│   ├── main.js           # メインプロセス & ローカル WebSocket サーバー (ポート 8765)
+│   ├── main.js           # メインプロセス & ローカル WebSocket サーバー (ポート 18765)
 │   ├── preload.js        # WebExtension API (browser.*) 互換ポリフィル
 │   └── src/              # 既存の UI 資産 (main.html, libs, icons, options)
 ├── extension/            # 【接続用ブラウザ拡張機能 (Manifest V3)】
@@ -40,7 +40,7 @@ STSen-Extension/
    ```powershell
    npm start
    ```
-   デスクトップアプリが起動し、ローカル WebSocket サーバー（`ws://127.0.0.1:8765`）が自動的に待機状態になります。
+   デスクトップアプリが起動し、ローカル WebSocket サーバー（`ws://127.0.0.1:18765`）が自動的に待機状態になります。
 
 ---
 
@@ -60,5 +60,23 @@ STSen-Extension/
 
 ### 3. 連携の確認
 1. デスクトップアプリを起動した状態で、ブラウザでニコニコ生放送の配信・視聴ページ（`https://live.nicovideo.jp/watch/lvXXXXXX`）を開きます。
-2. 拡張機能が自動的にローカル WebSocket（ポート 8765）へ接続し、番組情報（embedded-data）がデスクトップアプリへ送信されます。
+2. 拡張機能が自動的にローカル WebSocket（ポート 18765）へ接続し、番組情報（embedded-data）がデスクトップアプリへ送信されます。
 3. 枠自動延長や動画再生検知が従来通りシームレスに機能します。
+---
+
+## 配布用パッケージ（インストーラ版 & zip版）
+
+pp/dist/ 配下に配布用パッケージが生成されています。
+
+- **インストーラ版 (NSIS .exe)**: pp/dist/New NicoLive Helper Setup 1.0.0.exe
+  - デスクトップやスタートメニューにショートカットを作成し、通常通りインストールして使用できます。
+- **ポータブル版 (.zip)**: pp/dist/New NicoLive Helper-1.0.0-win.zip
+  - 解凍後、任意のフォルダで New NicoLive Helper.exe を直接起動できます（インストール不要）。
+
+### 再ビルドコマンド
+pp ディレクトリで以下のコマンドを実行します：
+`powershell
+npm run dist           # インストーラ版と zip 版の両方を生成
+npm run dist:installer # インストーラ版のみ生成
+npm run dist:zip       # zip 版のみ生成
+`

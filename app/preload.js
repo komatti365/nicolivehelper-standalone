@@ -1,10 +1,42 @@
-﻿const { ipcRenderer } = require('electron');
+﻿// -------------------------------------------------------------
+// XHR フック (withCredentials 自動有効化 & unsafe header エラー防止)
+// -------------------------------------------------------------
+try {
+  const originalOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (...args) {
+    const res = originalOpen.apply(this, args);
+    try { this.withCredentials = true; } catch (e) {}
+    return res;
+  };
 
-// ストレージ変更リスナー
+  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
+    if (header && (header.toLowerCase() === 'user-agent' || header.toLowerCase() === 'cookie')) {
+      // メインプロセス側で注入するため、レンダラーでの unsafe header エラーを回避
+      return;
+    }
+    return originalSetRequestHeader.apply(this, [header, value]);
+  };
+} catch (e) {
+  console.error('[Preload] Failed to patch XMLHttpRequest:', e);
+}
+
+const { ipcRenderer } = require('electron');
+
+console.log('[Preload] Initializing browser API polyfill in renderer...');
+
+// window.prompt ポリフィル
+window.prompt = function (message, defaultValue) {
+  console.log('[Prompt called]', message, defaultValue);
+  return defaultValue !== undefined ? String(defaultValue) : null;
+};
+
 const storageChangeListeners = new Set();
 const runtimeMessageListeners = new Set();
 
-// localStorage をバックエンドにした browser.storage.local ポリフィル
+// -------------------------------------------------------------
+// storage.local (localStorage バックエンド)
+// -------------------------------------------------------------
 const storageLocal = {
   get: async (keys) => {
     const result = {};
@@ -20,9 +52,7 @@ const storageLocal = {
       return result;
     }
 
-    if (typeof keys === 'string') {
-      keys = [keys];
-    }
+    if (typeof keys === 'string') keys = [keys];
 
     if (Array.isArray(keys)) {
       for (const k of keys) {
@@ -68,84 +98,63 @@ const storageLocal = {
       changes[k] = { oldValue, newValue: v };
     }
 
-    // onChanged リスナーに通知
     for (const listener of storageChangeListeners) {
       try {
         listener(changes, 'local');
       } catch (err) {
-        console.error('storage.onChanged listener error:', err);
+        console.error('storage.onChanged error:', err);
       }
     }
   },
 
   remove: async (keys) => {
     if (typeof keys === 'string') keys = [keys];
-    for (const k of keys) {
-      localStorage.removeItem(k);
-    }
+    for (const k of keys) localStorage.removeItem(k);
   },
 
-  clear: async () => {
-    localStorage.clear();
-  }
+  clear: async () => localStorage.clear()
 };
 
-// browser API ポリフィル
+// -------------------------------------------------------------
+// window.browser ポリフィル本体
+// -------------------------------------------------------------
 window.browser = {
-  storage: {
-    local: storageLocal,
-    onChanged: {
-      addListener: (cb) => storageChangeListeners.add(cb),
-      removeListener: (cb) => storageChangeListeners.delete(cb),
-      hasListener: (cb) => storageChangeListeners.has(cb)
+  // management API
+  management: {
+    getSelf: async () => {
+      return {
+        id: 'stsen-app',
+        name: 'New NicoLive Helper',
+        version: '1.0.0',
+        installType: 'development',
+        type: 'extension'
+      };
     }
   },
 
-  runtime: {
-    sendMessage: async (message) => {
-      if (!message || !message.cmd) return null;
-
-      switch (message.cmd) {
-        case 'get-liveinfo':
-          return await ipcRenderer.invoke('get-liveinfo', message.request_id);
-
-        case 'open-nicolivehelper':
-          return await ipcRenderer.invoke('open-main-window', message.request_id);
-
-        default:
-          // 拡張機能へ転送
-          ipcRenderer.send('to-extension', message);
-          return null;
-      }
-    },
-
-    onMessage: {
-      addListener: (cb) => runtimeMessageListeners.add(cb),
-      removeListener: (cb) => runtimeMessageListeners.delete(cb),
-      hasListener: (cb) => runtimeMessageListeners.has(cb)
-    },
-
-    openOptionsPage: () => {
-      ipcRenderer.invoke('open-subwindow', {
-        url: 'options/options.html',
-        width: 650,
-        height: 700,
-        title: 'New NicoLive Helper 設定'
-      });
-    },
-
-    getURL: (path) => path
-  },
-
+  // windows API
   windows: {
+    getCurrent: async () => {
+      return {
+        id: 1,
+        left: window.screenX,
+        top: window.screenY,
+        width: window.outerWidth,
+        height: window.outerHeight,
+        focused: true
+      };
+    },
+    update: async (id, info) => {
+      if (info && (info.width || info.height)) {
+        window.resizeTo(info.width || window.outerWidth, info.height || window.outerHeight);
+      }
+      return { id: 1 };
+    },
     create: async (options) => {
       let subUrl = options.url || '';
-      // 相対パスの正規化
       if (subUrl.startsWith('../')) {
         subUrl = subUrl.replace(/^\.\.\//, '');
-      } else if (subUrl.startsWith('main/')) {
-        // main/main.html など
-      } else {
+      } else if (!subUrl.startsWith('main/')) {
         subUrl = 'main/' + subUrl;
       }
 
@@ -156,10 +165,10 @@ window.browser = {
       });
       return { id: 1 };
     },
-    get: async () => ({ tabs: [] }),
-    update: async () => {}
+    get: async () => ({ tabs: [] })
   },
 
+  // tabs API
   tabs: {
     create: async (options) => {
       if (options.url) {
@@ -169,10 +178,90 @@ window.browser = {
           ipcRenderer.invoke('open-subwindow', { url: options.url });
         }
       }
+      return { id: 1 };
     },
+    query: async () => [],
+    remove: async () => {},
     sendMessage: async (tabId, message) => {
       ipcRenderer.send('to-extension', message);
     }
+  },
+
+  // downloads API
+  downloads: {
+    download: async (options) => {
+      console.log('[Preload:downloads.download]', options);
+      if (options.url) {
+        const a = document.createElement('a');
+        a.href = options.url;
+        a.download = options.filename || 'download.txt';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 100);
+      }
+      return 1;
+    }
+  },
+
+  // notifications API
+  notifications: {
+    create: async (id, options) => {
+      console.log('[Preload:notifications.create]', options);
+      return id || '1';
+    }
+  },
+
+  // storage API
+  storage: {
+    local: storageLocal,
+    onChanged: {
+      addListener: (cb) => storageChangeListeners.add(cb),
+      removeListener: (cb) => storageChangeListeners.delete(cb),
+      hasListener: (cb) => storageChangeListeners.has(cb)
+    }
+  },
+
+  // runtime API
+  runtime: {
+    getManifest: () => ({
+      name: 'New NicoLive Helper',
+      version: '1.0.0'
+    }),
+    sendMessage: async (message) => {
+      console.log('[Preload:runtime.sendMessage]', message);
+      if (!message || !message.cmd) return null;
+
+      switch (message.cmd) {
+        case 'get-liveinfo': {
+          const res = await ipcRenderer.invoke('get-liveinfo', message.request_id);
+          console.log('[Preload:get-liveinfo response]', res ? `SUCCESS (${res.program && res.program.title})` : 'NOT FOUND');
+          return res;
+        }
+
+        case 'open-nicolivehelper':
+          return await ipcRenderer.invoke('open-main-window', message.request_id);
+
+        default:
+          ipcRenderer.send('to-extension', message);
+          return null;
+      }
+    },
+    onMessage: {
+      addListener: (cb) => {
+        runtimeMessageListeners.add(cb);
+      },
+      removeListener: (cb) => runtimeMessageListeners.delete(cb),
+      hasListener: (cb) => runtimeMessageListeners.has(cb)
+    },
+    openOptionsPage: () => {
+      ipcRenderer.invoke('open-subwindow', {
+        url: 'options/options.html',
+        width: 650,
+        height: 700,
+        title: 'New NicoLive Helper 設定'
+      });
+    },
+    getURL: (path) => path
   },
 
   extension: {
@@ -184,12 +273,11 @@ window.browser = {
   }
 };
 
-// Chrome 互換用エイリアス
 window.chrome = window.browser;
 
-// メインプロセスからのメッセージ（拡張機能から届いたデータ等）を受信
+// メインプロセスからのメッセージを受信
 ipcRenderer.on('from-extension', (event, data) => {
-  console.log('[Preload] Received from extension:', data);
+  console.log('[Preload] Message from extension:', data);
   for (const listener of runtimeMessageListeners) {
     try {
       listener(data, { id: 'extension' }, () => {});
@@ -199,9 +287,4 @@ ipcRenderer.on('from-extension', (event, data) => {
   }
 });
 
-// 新しい放送IDへ切り替え通知を受信
-ipcRenderer.on('navigate-live', (event, lvid) => {
-  const currentUrl = new URL(window.location.href);
-  currentUrl.searchParams.set('lv', lvid);
-  window.location.href = currentUrl.toString();
-});
+console.log('[Preload] Polyfill successfully injected. Initial URL:', window.location.href);

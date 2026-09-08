@@ -432,3 +432,66 @@ function Notification( title, text ){
         "message": text
     } );
 }
+
+
+/**
+ * 入力ダイアログを表示する (HTMLモーダル / Promise返却)
+ * @param {string} title メッセージ・タイトル
+ * @param {string} defaultValue 初期値
+ * @returns {Promise<string|null>} 入力された文字列 (キャンセル時は null)
+ */
+function ShowPromptDialog(title, defaultValue) {
+    defaultValue = (defaultValue !== undefined && defaultValue !== null) ? String(defaultValue) : '';
+    return new Promise((resolve) => {
+        const old = document.getElementById('stsen-custom-prompt-modal');
+        if (old) old.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'stsen-custom-prompt-modal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.55);z-index:9999999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);';
+
+        const safeTitle = htmlspecialchars(title || '入力してください');
+        const safeVal = htmlspecialchars(defaultValue);
+
+        modal.innerHTML = [
+            '<div style="background:#fff;color:#333;border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,0.4);padding:20px 24px;width:420px;max-width:90vw;font-family:sans-serif;">',
+            '  <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#222;">' + safeTitle + '</div>',
+            '  <input id="stsen-prompt-input" type="text" class="form-control" style="width:100%;padding:8px 12px;border:1px solid #ced4da;border-radius:4px;font-size:14px;box-sizing:border-box;margin-bottom:16px;" value="' + safeVal + '">',
+            '  <div style="display:flex;justify-content:flex-end;gap:8px;">',
+            '    <button id="stsen-prompt-cancel" class="btn btn-secondary btn-sm" style="padding:4px 16px;">キャンセル</button>',
+            '    <button id="stsen-prompt-ok" class="btn btn-primary btn-sm" style="padding:4px 20px;">OK</button>',
+            '  </div>',
+            '</div>'
+        ].join('\n');
+
+        document.body.appendChild(modal);
+
+        const input = modal.querySelector('#stsen-prompt-input');
+        const btnOk = modal.querySelector('#stsen-prompt-ok');
+        const btnCancel = modal.querySelector('#stsen-prompt-cancel');
+
+        const finish = (result) => {
+            modal.remove();
+            resolve(result);
+        };
+
+        btnOk.addEventListener('click', () => finish(input.value));
+        btnCancel.addEventListener('click', () => finish(null));
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                finish(input.value);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                finish(null);
+            }
+        });
+
+        setTimeout(() => {
+            input.focus();
+            input.select();
+        }, 50);
+    });
+}
+window.ShowPromptDialog = ShowPromptDialog;

@@ -1,15 +1,60 @@
-﻿{
-  "name": "stsen-app",
+{
+  "name": "new-nicolive-helper",
+  "productName": "New NicoLive Helper",
   "version": "1.0.0",
   "description": "New NicoLive Helper Desktop Application",
   "main": "main.js",
+  "author": "amano / komatti365",
+  "license": "MIT",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --win nsis zip",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:zip": "electron-builder --win zip"
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "electron": "^33.2.0"
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.komatti365.nicolivehelper",
+    "productName": "New NicoLive Helper",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/icons/icon-256.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "New NicoLive Helper"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ]
   }
 }

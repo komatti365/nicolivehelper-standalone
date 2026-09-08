@@ -73,7 +73,7 @@ var NicoLiveComment = {
             }
         }
 
-        let newname = window.prompt( `ユーザー:${user_id}の表示名を入力してください`, name );
+        let newname = await ShowPromptDialog(`ユーザー:${user_id}の表示名を入力してください`, name);
         if( newname ){
             this.addReflection( user_id, newname, 1 );
             UserManage.createTable();
@@ -415,8 +415,7 @@ var NicoLiveComment = {
                 defvalue = await this.getProfileName( user_id, this.getKotehan( user_id ) );
             }catch( e ){
             }
-            let name = window.prompt( `${user_id}のコテハンを設定`, defvalue );
-            this.setKotehan( user_id, name );
+            let name = await ShowPromptDialog(`${user_id}のコテハンを設定`, defvalue); if (name !== null) this.setKotehan(user_id, name);
             break;
 
         default:
