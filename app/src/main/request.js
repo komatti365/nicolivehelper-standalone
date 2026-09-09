@@ -315,6 +315,11 @@ var NicoLiveRequest = {
      * @returns {Promise<void>}
      */
     addRequests: async function( video_id ){
+        if (window.RemoteClient && window.RemoteClient.isConnected()) {
+            window.RemoteClient.sendAction('request-add', { videoId: video_id });
+            $( '#input-request-video' ).val( '' );
+            return;
+        }
         console.log( video_id );
         if( video_id.length < 3 ) return;
         let l = video_id.match( /(sm|nm|so)\d+|\d{10}/g );

@@ -158,6 +158,21 @@ async function LoadOptions(){
 
     let config = result.config || {};
 
+    /* リモートホスト設定 */
+    LoadBool( 'remote-server-enabled', config, false );
+    LoadValue( 'remote-server-port', config, 18767 );
+    LoadValue( 'remote-server-password', config, '' );
+
+    if (typeof window.stsen !== 'undefined' && window.stsen.getRemoteServerStatus) {
+        window.stsen.getRemoteServerStatus().then(status => {
+            if (status && status.running) {
+                $('#opt-remote-server-status-badge').text(`稼働中 (ポート ${status.port})`).css('background', '#28a745');
+            } else {
+                $('#opt-remote-server-status-badge').text('停止中').css('background', '#6c757d');
+            }
+        });
+    }
+
     /* 進行 */
     LoadValue( 'play-default-volume', config, Config['play-default-volume'] );
     LoadValue( 'autoplay-interval', config, Config['autoplay-interval'] );
@@ -297,6 +312,11 @@ function SaveOptions( ev ){
 
     let config = {};
 
+    /* リモートホスト設定 */
+    SaveBool( 'remote-server-enabled', config );
+    SaveInt( 'remote-server-port', config );
+    SaveValue( 'remote-server-password', config );
+
     /* 進行 */
     SaveInt( 'play-default-volume', config );
     SaveInt( 'autoplay-interval', config );
@@ -382,6 +402,20 @@ function SaveOptions( ev ){
     browser.storage.local.set( {
         'config': config
     } );
+
+    if (typeof window.stsen !== 'undefined' && window.stsen.updateRemoteServerConfig) {
+        window.stsen.updateRemoteServerConfig({
+            enabled: config['remote-server-enabled'],
+            port: config['remote-server-port'],
+            password: config['remote-server-password']
+        }).then(status => {
+            if (status && status.running) {
+                $('#opt-remote-server-status-badge').text(`稼働中 (ポート ${status.port})`).css('background', '#28a745');
+            } else {
+                $('#opt-remote-server-status-badge').text('停止中').css('background', '#6c757d');
+            }
+        });
+    }
 }
 
 window.addEventListener( 'load', async function( ev ){

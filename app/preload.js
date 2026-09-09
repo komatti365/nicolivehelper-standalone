@@ -242,7 +242,7 @@ ipcRenderer.on('from-extension', (event, data) => {
 });
 
 console.log('[Preload] Polyfill successfully injected. Initial URL:', window.location.href);
-// STSen 専用 API (内蔵ブラウザログイン / 枠手動接続 / アカウント管理)
+// STSen 専用 API (内蔵ブラウザログイン / 枠手動接続 / アカウント管理 / リモート連携)
 window.stsen = {
   openLoginWindow: () => ipcRenderer.invoke('open-login-window'),
   logout: () => ipcRenderer.invoke('logout'),
@@ -256,7 +256,20 @@ window.stsen = {
   showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),
   onAccountStatusChanged: (callback) => {
     ipcRenderer.on('account-status-changed', (event, data) => callback(data));
-  }
+  },
+  // リモート連携 API
+  getCookiesForSync: () => ipcRenderer.invoke('get-cookies-for-sync'),
+  sendRemoteHostStateUpdate: (state) => ipcRenderer.send('remote-host-state-update', state),
+  sendRemoteHostBroadcastEvent: (type, data) => ipcRenderer.send('remote-host-broadcast-event', { type, data }),
+  onRemoteHostExecuteAction: (callback) => {
+    ipcRenderer.on('remote-host-execute-action', (event, data) => callback(data));
+  },
+  sendRemoteActionResult: (actionId, data, error) => {
+    // ipcMain.handleOnce('remote-action-res:${actionId}') は invoke でレスポンスを送る
+    return ipcRenderer.invoke(`remote-action-res:${actionId}`, { data, error });
+  },
+  getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
+  updateRemoteServerConfig: (config) => ipcRenderer.invoke('remote-server-update-config', config)
 };
 
 ipcRenderer.on('account-status-changed', (event, data) => {

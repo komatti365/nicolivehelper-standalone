@@ -45,6 +45,16 @@ var NicoLiveHelper = {
     _autoplay_timer: null,  ///< 自動再生用タイマー
     _remain_timer_format_type: 0,   ///< 再生中動画の時間表示フォーマット種別(0:残り時間,1:経過時間,2:動作再生終了時の枠残り時間)
 
+    _comm: null,                        ///< WebSocket通信インスタンス
+    _seat_interval: null,               ///< 座席維持(keepSeat)送信インターバル
+    _ws_reconnect_timer: null,          ///< 再接続タイマー
+    _ws_reconnect_attempts: 0,          ///< 連続再接続試行回数
+    _ws_is_intentional_close: false,    ///< 意図的な切断かどうかのフラグ
+    _ws_audience_token: null,           ///< サーバーから受信した再接続用トークン
+    _ws_is_reconnecting: false,         ///< 再接続処理実行中フラグ
+    _active_comment_view_uri: null,     ///< 現在接続中のコメントサーバーURI
+    _startup_comment_sent: false,       ///< 起動時コメント送信済みフラグ
+
     endpointUrl: "https://services-eapi.spi.nicovideo.jp",
 
     /**
@@ -1511,85 +1521,294 @@ var NicoLiveHelper = {
     },
 
     onWatchCommandReceived: function( data ){
-        console.log( data ); // TODO 受信時のログ表示
+        console.log( '[WatchWS] Received command:', data.type, data );
         let body = data.data;
         switch( data.type ){
         case 'messageServer':
-            // data.data.messageServer.uri;
-            // data.data.messageServer.type;
-            // data.data.threadId;
             this.connecttime = GetCurrentTime();
-            this.connectCommentServer( body );
+            if( body && body.viewUri ){
+                if( this._active_comment_view_uri !== body.viewUri ){
+                    this._active_comment_view_uri = body.viewUri;
+                    this.connectCommentServer( body );
+                }else{
+                    console.log( '[WatchWS] Already connected to comment server URI:', body.viewUri );
+                }
+            }
             (async () => {
                 await this.initProgressBar();
-                if( !this.currentVideo ){
+                if( !this.currentVideo && !this._startup_comment_sent ){
+                    this._startup_comment_sent = true;
                     this.sendStartupComment();
                 }
             })();
             break;
 
         case 'statistics':
-            $( '#number-of-listeners' ).text( FormatCommas( body.viewers ) );
-            console.log( `Now ${body.viewers} listener(s).` );
+            if( body && typeof body.viewers !== 'undefined' ){
+                $( '#number-of-listeners' ).text( FormatCommas( body.viewers ) );
+                console.log( `Now ${body.viewers} listener(s).` );
+            }
             break;
+
         case 'schedule':
-            console.log( body.begin );
-            this.live_begintime = parseInt( (new Date( body.begin )).getTime() / 1000 );
-            this.live_endtime = parseInt( (new Date( body.end )).getTime() / 1000 );
-            $( '#live-progress' ).attr( 'title', `終了日時: ${GetDateTimeString( this.live_endtime * 1000, 1 )}` );
+            if( body && body.begin && body.end ){
+                console.log( body.begin );
+                this.live_begintime = parseInt( (new Date( body.begin )).getTime() / 1000 );
+                this.live_endtime = parseInt( (new Date( body.end )).getTime() / 1000 );
+                $( '#live-progress' ).attr( 'title', `終了日時: ${GetDateTimeString( this.live_endtime * 1000, 1 )}` );
+            }
             break;
 
         case 'ping':
-            this._comm.send( '{"type":"pong"}' );
+            if( this._comm && this._comm.isOpen() ){
+                this._comm.send( '{"type":"pong"}' );
+            }
             break;
 
         case 'seat':
-            clearInterval( this._seat_interval );
+            if( this._seat_interval ){
+                clearInterval( this._seat_interval );
+                this._seat_interval = null;
+            }
+            let keepInterval = ( body && body.keepIntervalSec ? body.keepIntervalSec : 30 ) * 1000;
             this._seat_interval = setInterval( () => {
-                this._comm.send( '{"type":"keepSeat"}' );
-            }, body.keepIntervalSec * 1000 );
+                if( this._comm && this._comm.isOpen() ){
+                    this._comm.send( '{"type":"keepSeat"}' );
+                }
+            }, keepInterval );
+            break;
+
+        case 'reconnect':
+            console.log( '[WatchWS] Received reconnect command from server:', body );
+            if( body && body.audienceToken ){
+                this._ws_audience_token = body.audienceToken;
+                console.log( '[WatchWS] Updated audienceToken for reconnect.' );
+            }
+            let waitTimeSec = ( body && typeof body.waitTimeSec === 'number' ) ? body.waitTimeSec : 0;
+            if( this._comm ){
+                this._comm.close( 1000, 'Server requested reconnect' );
+            }
+            this.scheduleReconnect( waitTimeSec, true );
+            break;
+
+        case 'disconnect':
+            let reason = ( body && body.reason ) || 'UNKNOWN';
+            console.warn( `[WatchWS] Received disconnect command: ${reason}` );
+            switch( reason ){
+            case 'END_PROGRAM':
+                this._ws_is_intentional_close = true;
+                this.showAlert( '番組が終了しました' );
+                break;
+            case 'TAKEOVER':
+                this._ws_is_intentional_close = true;
+                this.showAlert( '他の端末またはブラウザから視聴されたため切断されました（追い出し）', true );
+                break;
+            case 'NO_PERMISSION':
+                this._ws_is_intentional_close = true;
+                this.showAlert( '座席を取得できませんでした', true );
+                break;
+            case 'TOO_MANY_CONNECTIONS':
+            case 'TOO_MANY_WATCHINGS':
+                this._ws_is_intentional_close = true;
+                this.showAlert( `接続制限に達したため切断されました (${reason})`, true );
+                break;
+            case 'SERVICE_TEMPORARILY_UNAVAILABLE':
+            case 'PING_TIMEOUT':
+            case 'CROWDED':
+            default:
+                this.showAlert( `サーバーから一時切断されました (${reason})。再接続を試みます...` );
+                break;
+            }
             break;
 
         case 'postCommentResult':
-            // let a = {
-            //     "type": "postCommentResult",
-            //     "data": {"chat": {"content": "aaa", "mail": "white naka medium", "anonymity": 0, "restricted": false}}
-            // }
             break;
         }
     },
 
     /**
-     *　ニコ生に接続開始する.
+     * WebSocket URL を生成（audience_token が更新されている場合は適用）.
+     * @returns {string|null}
      */
-    connectServer: function(){
-        console.log( 'connect websocket' );
-        let ws = this.liveProp.site.relive.webSocketUrl + `&frontend_id=${this.liveProp.site.frontendId}`;
+    getWatchWebSocketUrl: function(){
+        if( !this.liveProp || !this.liveProp.site || !this.liveProp.site.relive ){
+            return null;
+        }
+        let urlStr = this.liveProp.site.relive.webSocketUrl;
+        if( !urlStr ) return null;
+
+        try {
+            let url = new URL( urlStr );
+            if( this.liveProp.site.frontendId && !url.searchParams.has( 'frontend_id' ) ){
+                url.searchParams.set( 'frontend_id', this.liveProp.site.frontendId );
+            }
+            if( this._ws_audience_token ){
+                url.searchParams.set( 'audience_token', this._ws_audience_token );
+            }
+            return url.toString();
+        } catch( e ) {
+            let ws = urlStr;
+            if( this.liveProp.site.frontendId && !ws.includes( 'frontend_id=' ) ){
+                ws += ( ws.includes( '?' ) ? '&' : '?' ) + `frontend_id=${this.liveProp.site.frontendId}`;
+            }
+            if( this._ws_audience_token ){
+                if( ws.includes( 'audience_token=' ) ){
+                    ws = ws.replace( /([?&]audience_token=)[^&]*/, `$1${encodeURIComponent( this._ws_audience_token )}` );
+                } else {
+                    ws += ( ws.includes( '?' ) ? '&' : '?' ) + `audience_token=${encodeURIComponent( this._ws_audience_token )}`;
+                }
+            }
+            return ws;
+        }
+    },
+
+    /**
+     * WebSocket切断時の再接続をスケジュールする.
+     * @param {number} [waitTimeSec] サーバーから指定された待機秒数
+     * @param {boolean} [isServerInitiated] サーバーからのreconnect指示によるものか
+     */
+    scheduleReconnect: function( waitTimeSec, isServerInitiated ){
+        if( this._ws_is_intentional_close ){
+            console.log( '[WatchWS] Will not reconnect because close was intentional.' );
+            return;
+        }
+
+        const MAX_ATTEMPTS = 10;
+        if( this._ws_reconnect_attempts >= MAX_ATTEMPTS ){
+            console.error( `[WatchWS] Reconnect failed: exceeded max attempts (${MAX_ATTEMPTS}).` );
+            this.showAlert( 'WebSocketへの再接続上限回数を超えたため再接続を中止しました。', true );
+            this._ws_is_reconnecting = false;
+            return;
+        }
+
+        if( this._ws_reconnect_timer ){
+            clearTimeout( this._ws_reconnect_timer );
+            this._ws_reconnect_timer = null;
+        }
+
+        let delayMs;
+        if( isServerInitiated && typeof waitTimeSec === 'number' && waitTimeSec >= 0 ){
+            delayMs = ( waitTimeSec * 1000 ) + Math.floor( Math.random() * 500 );
+        }else{
+            let baseDelay = Math.min( 1500 * Math.pow( 1.5, this._ws_reconnect_attempts ), 30000 );
+            delayMs = Math.round( baseDelay + Math.floor( Math.random() * 1000 ) );
+        }
+
+        this._ws_reconnect_attempts++;
+        this._ws_is_reconnecting = true;
+        console.log( `[WatchWS] Scheduling reconnect attempt #${this._ws_reconnect_attempts} in ${delayMs}ms...` );
+        this.showAlert( `WebSocket切断を検知しました。${Math.ceil( delayMs / 1000 )}秒後に再接続します...` );
+
+        this._ws_reconnect_timer = setTimeout( () => {
+            this._ws_reconnect_timer = null;
+            this.connectServer( true );
+        }, delayMs );
+    },
+
+    /**
+     * WebSocketを切断し、タイマーを停止する.
+     */
+    disconnectServer: function(){
+        this._ws_is_intentional_close = true;
+        if( this._ws_reconnect_timer ){
+            clearTimeout( this._ws_reconnect_timer );
+            this._ws_reconnect_timer = null;
+        }
+        this._ws_is_reconnecting = false;
+        this._ws_reconnect_attempts = 0;
+        this._ws_audience_token = null;
+        if( this._seat_interval ){
+            clearInterval( this._seat_interval );
+            this._seat_interval = null;
+        }
+        if( this._comm ){
+            this._comm.close( 1000, 'Client disconnected' );
+            this._comm = null;
+        }
+    },
+
+    /**
+     * ニコ生に接続開始する.
+     * @param {boolean} [isReconnect=false] 再接続かどうか
+     */
+    connectServer: function( isReconnect ){
+        isReconnect = !!isReconnect;
+        console.log( `[WatchWS] connect websocket... (isReconnect: ${isReconnect})` );
+
+        this._ws_is_intentional_close = false;
+
+        if( this._seat_interval ){
+            clearInterval( this._seat_interval );
+            this._seat_interval = null;
+        }
+        if( this._comm ){
+            try {
+                this._comm.close( 1000, 'Reconnecting' );
+            } catch( e ) {
+                console.warn( '[WatchWS] Error closing old comm socket:', e );
+            }
+            this._comm = null;
+        }
+
+        let ws = this.getWatchWebSocketUrl();
+        if( !ws ){
+            console.error( '[WatchWS] WebSocket URL is not available in liveProp.' );
+            this.showAlert( 'WebSocket接続先URLが取得できませんでした', true );
+            return;
+        }
 
         this._comm = new Comm( ws );
-        this._comm.connect();
+        let socket = this._comm.connect();
+        if( !socket ){
+            console.error( '[WatchWS] Failed to instantiate WebSocket.' );
+            this.scheduleReconnect( 0, false );
+            return;
+        }
+
         this._comm.onConnect( ( ev ) => {
-            // はい。なおreconnectも省略可能なので {"type": "startWatching", "data":{}}  でよいです
-            console.log( `websocket connected. ${this.liveProp.program.nicoliveProgramId}` );
+            console.log( `[WatchWS] Connected. ${this.liveProp.program.nicoliveProgramId}` + ( isReconnect ? ' (reconnected)' : '' ) );
+            this._ws_reconnect_attempts = 0;
+            this._ws_is_reconnecting = false;
+            if( isReconnect ){
+                this.showAlert( 'WebSocketに再接続しました' );
+            }
+
             setTimeout( () => {
-                // let initmsg = {
-                //     "type": "startWatching",
-                //     "data": {
-                //         "stream": {
-                //             "quality": "super_low",
-                //             "protocol": "hls",
-                //             "latency": "high",
-                //             "chasePlay": false
-                //         }, "room": {"protocol": "webSocket", "commentable": true}, "reconnect": false
-                //     }
-                // };
-                let initmsg = {"type": "startWatching", "data": {}};
-                this._comm.send( JSON.stringify( initmsg ) );
+                let initmsg;
+                if( isReconnect ){
+                    initmsg = { "type": "startWatching", "data": { "reconnect": true } };
+                }else{
+                    initmsg = { "type": "startWatching", "data": {} };
+                }
+                if( this._comm && this._comm.isOpen() ){
+                    this._comm.send( JSON.stringify( initmsg ) );
+                }
             }, 100 );
         } );
+
         this._comm.onReceive( ( ev ) => {
-            let data = JSON.parse( ev.data );
-            this.onWatchCommandReceived( data );
+            try {
+                let data = JSON.parse( ev.data );
+                this.onWatchCommandReceived( data );
+            } catch( err ) {
+                console.error( '[WatchWS] JSON parse error in onReceive:', err, ev.data );
+            }
+        } );
+
+        this._comm.onError( ( ev ) => {
+            console.error( '[WatchWS] Socket error encountered:', ev );
+        } );
+
+        this._comm.onClose( ( ev ) => {
+            console.warn( `[WatchWS] Socket closed (code: ${ev.code}, reason: ${ev.reason || 'none'}, wasClean: ${ev.wasClean})` );
+            if( this._seat_interval ){
+                clearInterval( this._seat_interval );
+                this._seat_interval = null;
+            }
+
+            if( !this._ws_is_intentional_close ){
+                this.scheduleReconnect( 0, false );
+            }
         } );
     },
 
@@ -2237,6 +2456,10 @@ var NicoLiveHelper = {
                 const m = val.match(/lv\d+/) || val.match(/\d+/);
                 if (m) {
                     const targetId = m[0].startsWith('lv') ? m[0] : 'lv' + m[0];
+                    if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                        window.RemoteClient.sendAction('load-live', { lvid: targetId });
+                        return;
+                    }
                     window.location.href = 'main.html?lv=' + targetId;
                 } else {
                     alert('有効な配信ID（例: lv12345678）を入力してください。');
@@ -2252,6 +2475,10 @@ var NicoLiveHelper = {
 
             $(document).on('click', '#btn-auto-detect-live', async function(e){
                 e.preventDefault();
+                if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                    window.RemoteClient.sendAction('detect-live');
+                    return;
+                }
                 const $btn = $(this);
                 const originalText = $btn.html();
                 $btn.prop('disabled', true).html('⏳ 検出中...');
@@ -2274,22 +2501,126 @@ var NicoLiveHelper = {
                 }
             });
 
+            function initRemoteClientUI() {
+                const savedHost = localStorage.getItem('remote-last-host') || '';
+                const savedPw = localStorage.getItem('remote-last-pw') || '';
+                if (savedHost) $('#remote-host-input').val(savedHost);
+                if (savedPw) $('#remote-password-input').val(savedPw);
+
+                const openModal = (e) => {
+                    if (e) e.preventDefault();
+                    const isConn = window.RemoteClient && window.RemoteClient.isConnected();
+                    if (isConn) {
+                        $('#btn-remote-disconnect').show();
+                        $('#btn-remote-connect-submit').text('再接続');
+                        $('#remote-connect-status-msg').removeClass('alert-danger').addClass('alert-success').show().text(`接続中: ${window.RemoteClient.hostUrl}`);
+                    } else {
+                        $('#btn-remote-disconnect').hide();
+                        $('#btn-remote-connect-submit').text('接続');
+                        $('#remote-connect-status-msg').hide();
+                    }
+                    $('#modal-remote-connect').modal('show');
+                };
+
+                $(document).on('click', '#btn-remote-connect-open', openModal);
+                $(document).on('click', '#menu-remote-connect', openModal);
+                $(document).on('click', '#remote-connection-badge', openModal);
+
+                $('#btn-remote-connect-submit').on('click', async () => {
+                    const host = $('#remote-host-input').val().trim();
+                    const pw = $('#remote-password-input').val().trim();
+                    if (!host) {
+                        alert('接続先ホストを入力してください');
+                        return;
+                    }
+
+                    const $btn = $('#btn-remote-connect-submit');
+                    $btn.prop('disabled', true).text('接続中...');
+                    $('#remote-connect-status-msg').hide();
+
+                    try {
+                        localStorage.setItem('remote-last-host', host);
+                        localStorage.setItem('remote-last-pw', pw);
+                        await window.RemoteClient.connect(host, pw);
+                        $('#modal-remote-connect').modal('hide');
+                    } catch (err) {
+                        $('#remote-connect-status-msg')
+                            .removeClass('alert-success')
+                            .addClass('alert-danger')
+                            .show()
+                            .text(err.message || '接続に失敗しました');
+                    } finally {
+                        $btn.prop('disabled', false).text('接続');
+                    }
+                });
+
+                $('#btn-remote-disconnect').on('click', () => {
+                    if (window.RemoteClient) {
+                        window.RemoteClient.disconnect();
+                    }
+                    $('#modal-remote-connect').modal('hide');
+                });
+
+                // ログアウト時の確認処理
+                $(document).on('click', '#btn-account-logout', (e) => {
+                    if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        $('#modal-remote-logout-confirm').modal('show');
+                    }
+                });
+
+                $('#btn-logout-client-only').on('click', async () => {
+                    $('#modal-remote-logout-confirm').modal('hide');
+                    if (window.stsen && window.stsen.logout) {
+                        await window.stsen.logout();
+                        updateAccountUI();
+                    }
+                });
+
+                $('#btn-logout-both').on('click', async () => {
+                    $('#modal-remote-logout-confirm').modal('hide');
+                    if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                        try {
+                            window.RemoteClient.ws.send(JSON.stringify({ type: 'logout' }));
+                        } catch (e) {}
+                    }
+                    if (window.stsen && window.stsen.logout) {
+                        await window.stsen.logout();
+                        updateAccountUI();
+                    }
+                });
+            }
+
             updateAccountUI();
+            initRemoteClientUI();
         }
     },
 
     initUI: async function(){
         $( '#btn-play-next' ).on( 'click', ( ev ) => {
+            if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                window.RemoteClient.sendAction('play-next');
+                return;
+            }
             // 次を再生
             this.playNext();
         } );
 
         $( '#btn-stop-play' ).on( 'click', ( ev ) => {
+            if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                window.RemoteClient.sendAction('stop-play');
+                return;
+            }
             // 再生停止
             this.stopVideo();
         } );
 
         $( '#btn-resend-info' ).on( 'click', ( ev ) => {
+            if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                window.RemoteClient.sendAction('resend-info');
+                return;
+            }
             // 動画情報の送信
             this.sendVideoInfo( this.currentVideo );
         } );
@@ -2311,6 +2642,10 @@ var NicoLiveHelper = {
 
         /* プレイスタイルの変更 */
         $( '#sel-playstyle' ).on( 'change', ( ev ) => {
+            if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                window.RemoteClient.sendAction('set-playstyle', { style: this.getPlayStyle() });
+                return;
+            }
             if( this.getPlayStyle() == 0 ){
                 this.setAutoplayIndicator( false );
             }else{
@@ -2385,6 +2720,9 @@ var NicoLiveHelper = {
             }
         };
         $( '#sel-allow-request' ).on( 'change', ( ev ) => {
+            if (window.RemoteClient && window.RemoteClient.isConnected()) {
+                window.RemoteClient.sendAction('request-allow', { status: this.getRequestAllowedStatus() });
+            }
             frequest();
         } );
         frequest();
