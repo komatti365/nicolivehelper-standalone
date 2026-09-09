@@ -210,6 +210,9 @@ var NicoLiveComment = {
         }
 
         this.commentlog.push( comment );
+        if (window.RemoteHostBridge && window.RemoteHostBridge.onCommentReceived) {
+            window.RemoteHostBridge.onCommentReceived(comment);
+        }
 
         // 表示行数に切り詰め
         if( table.rows.length >= Config['comment-dispay-lines'] ){

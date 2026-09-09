@@ -41,6 +41,8 @@
   <script src="stock.js"></script>
   <script src="tagsearch.js"></script>
   <script src="comment.js"></script>
+  <script src="remoteHostBridge.js"></script>
+  <script src="remoteClient.js"></script>
   <script src="main.js"></script>
 
 </head>
@@ -66,6 +68,7 @@
         <a id="open-video-db" class="dropdown-item" href="#">動画DB</a>
         <a id="save-comment" class="dropdown-item" href="#">コメントをファイルに保存</a>
         <div class="dropdown-divider"></div>
+        <a id="menu-remote-connect" class="dropdown-item" href="#">🌐 リモートホストに接続...</a>
         <a id="menu-login" class="dropdown-item" href="#">ニコニコログイン (内蔵ブラウザ)</a>
         <a id="menu-input-session" class="dropdown-item" href="#">🔑 セッションキー直接入力</a>
         <a id="open-settings" class="dropdown-item" href="#">設定</a>
@@ -80,10 +83,17 @@
     <span id="community-id">co000000</span>
     <span id="live-title">[オフライン]</span>
     <span>放送主：<span id="live-caster">---</span></span>
+
+    <!-- リモート接続状態表示 -->
+    <span id="remote-connection-badge" class="badge badge-success" style="display: none; font-size: 11px; padding: 3px 7px; cursor: pointer;" title="クリックでリモート接続設定を開く">🌐 リモート接続中</span>
     </div>
 
-    <!-- アカウント状態 & 配信ID手動接続 -->
+    <!-- アカウント状態 & 配信ID手動接続 & リモート接続ボタン -->
     <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+      <button id="btn-remote-connect-open" class="btn btn-outline-primary btn-sm" type="button" style="height: 24px; font-size: 11px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px;" title="リモートホストに接続して遠隔操作します">
+        🌐 リモート接続
+      </button>
+
       <div class="input-group input-group-sm" style="width: 140px;">
         <input type="text" id="input-manual-lvid" class="form-control form-control-sm" placeholder="lv..." style="height: 24px; font-size: 11px; padding: 2px 4px;">
         <div class="input-group-append">
@@ -602,6 +612,66 @@
     </td>
   </tr>
 </template>
+
+<!-- リモート接続モーダル -->
+<div class="modal fade" id="modal-remote-connect" tabindex="-1" role="dialog" aria-labelledby="modalRemoteConnectTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content" style="box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="background: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+        <h5 class="modal-title" id="modalRemoteConnectTitle" style="font-size: 15px; font-weight: bold;">🌐 リモートホストに接続</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" style="font-size: 13px;">
+        <div class="form-group">
+          <label for="remote-host-input" style="font-weight: bold;">接続先ホスト (IPまたはホスト名:ポート):</label>
+          <input type="text" class="form-control form-control-sm" id="remote-host-input" placeholder="例: 192.168.1.50:18767 または localhost:18767">
+          <small class="form-text text-muted">Linuxサーバーや別PCで起動中の STSen-Extension のアドレスを指定します。</small>
+        </div>
+        <div class="form-group">
+          <label for="remote-password-input" style="font-weight: bold;">認証パスワード (ホスト側で設定されている場合):</label>
+          <input type="password" class="form-control form-control-sm" id="remote-password-input" placeholder="未設定の場合は空欄">
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="remote-sync-cookies-check" checked>
+          <label class="form-check-label" for="remote-sync-cookies-check" style="font-size: 12px; color: #495057;">
+            接続時に手元PCのニコニコログインセッション（Cookie）を自動転送する
+          </label>
+        </div>
+        <div id="remote-connect-status-msg" style="display:none; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin-top: 8px;"></div>
+      </div>
+      <div class="modal-footer" style="background: #f8f9fa; border-top: 1px solid #dee2e6;">
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">閉じる</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-remote-disconnect" style="display:none;">切断</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-remote-connect-submit">接続</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ログアウト時ホスト同期確認モーダル -->
+<div class="modal fade" id="modal-remote-logout-confirm" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" style="font-size: 15px; font-weight: bold;">ログアウト確認</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" style="font-size: 13px;">
+        現在リモートホストに接続中です。<br>
+        ホスト側（Linuxサーバー等）のアカウントも同時にログアウトしますか？
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-warning btn-sm" id="btn-logout-client-only">手元PCのみログアウト</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-logout-both">ホストも同時にログアウト</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

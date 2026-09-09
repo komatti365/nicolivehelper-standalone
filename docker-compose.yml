@@ -1,0 +1,17 @@
+services:
+  stsen-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stsen-host
+    restart: unless-stopped
+    ports:
+      - "18767:18767"
+    environment:
+      - STSEN_HOST_ENABLED=1
+      - STSEN_HOST_PORT=18767
+      # 認証パスワードを設定する場合はここに記述（空欄なら認証なし）
+      - STSEN_HOST_PASSWORD=
+    volumes:
+      # 設定データとセッションCookieをホスト側に永続化
+      - ./data:/root/.config/nicolivehelper-standalone

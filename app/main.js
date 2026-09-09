@@ -3,6 +3,30 @@ const { app, BrowserWindow, ipcMain, shell, session, dialog } = require('electro
 const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
+const RemoteServer = require('./remoteServer');
+
+// コマンドライン引数 & 環境変数の解析
+const argv = process.argv.slice(2);
+function getArgVal(flag) {
+  const idx = argv.indexOf(flag);
+  if (idx !== -1 && idx + 1 < argv.length) return argv[idx + 1];
+  const eqArg = argv.find(a => a.startsWith(`${flag}=`));
+  if (eqArg) return eqArg.split('=').slice(1).join('=');
+  return null;
+}
+const isHeadlessArg = argv.includes('--headless') || process.env.STSEN_HEADLESS === '1';
+const isHostArg = argv.includes('--host') || argv.includes('--remote-host') || process.env.STSEN_HOST_ENABLED === '1';
+const customPort = getArgVal('--port') || process.env.STSEN_HOST_PORT;
+const customPassword = getArgVal('--password') || process.env.STSEN_HOST_PASSWORD;
+
+if (isHeadlessArg) {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('no-sandbox');
+  console.log('[STSen] Running in HEADLESS mode.');
+}
+if (isHostArg) {
+  console.log('[STSen] Remote host mode forced via flag/env.');
+}
 
 // Cloudflare Turnstile / ボット検出対策
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
@@ -59,6 +83,9 @@ const liveProp = {};
 const activeExtensions = new Set();
 let wss = null;
 const WS_PORT = 18765;
+
+let remoteServer = null;
+let lastKnownState = {};
 
 // メモリ上にキャッシュする Cookie リスト
 let cachedCookies = [];
@@ -612,13 +639,80 @@ function getWebPreferences() {
   };
 }
 
+// -------------------------------------------------------------
+// リモートホストサーバー（API & WebSocket）の初期化
+// -------------------------------------------------------------
+function initRemoteServer() {
+  const storageData = loadStorageFile();
+  const config = storageData.config || {};
+
+  const enabled = isHostArg || config['remote-server-enabled'] === true || config['remote-server-enabled'] === 'true';
+  const port = parseInt(customPort || config['remote-server-port'] || 18767, 10);
+  const password = customPassword !== null && customPassword !== undefined ? customPassword : (config['remote-server-password'] || '');
+
+  if (remoteServer) {
+    remoteServer.updateConfig(port, password);
+    if (!enabled && remoteServer.running) {
+      remoteServer.stop();
+    } else if (enabled && !remoteServer.running) {
+      remoteServer.start();
+    }
+    return;
+  }
+
+  remoteServer = new RemoteServer({
+    port: port,
+    password: password,
+    getState: () => lastKnownState,
+    onAction: async (action, params) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        throw new Error('Main window is not available');
+      }
+      return new Promise((resolve, reject) => {
+        const actionId = `act_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const timeout = setTimeout(() => {
+          ipcMain.removeHandler(`remote-action-res:${actionId}`);
+          reject(new Error(`Action timeout: ${action}`));
+        }, 15000);
+
+        ipcMain.handleOnce(`remote-action-res:${actionId}`, (event, result) => {
+          clearTimeout(timeout);
+          if (result && result.error) {
+            reject(new Error(result.error));
+          } else {
+            resolve(result ? result.data : null);
+          }
+        });
+
+        mainWindow.webContents.send('remote-host-execute-action', { actionId, action, params });
+      });
+    },
+    onSyncCookies: async (cookies) => {
+      console.log(`[STSen:RemoteHost] Syncing ${cookies.length} cookies from remote client...`);
+      const success = await updateCookies(cookies);
+      broadcastAccountStatus();
+      return { success, count: cookies.length };
+    },
+    onLogout: async () => {
+      console.log('[STSen:RemoteHost] Logging out via remote client request...');
+      return await logout();
+    }
+  });
+
+  if (enabled) {
+    remoteServer.start();
+  }
+}
+
 // メインウィンドウの作成・表示
 function createOrFocusMainWindow(lvid = '') {
   const targetLvid = lvid || latestLvid;
 
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show();
-    mainWindow.focus();
+    if (!isHeadlessArg) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
     if (targetLvid) {
       const currentUrl = mainWindow.webContents.getURL();
       if (!currentUrl.includes(`lv=${targetLvid}`)) {
@@ -635,13 +729,14 @@ function createOrFocusMainWindow(lvid = '') {
   const mainHtmlPath = path.join(__dirname, 'src', 'main', 'main.html');
   const targetUrl = `file://${mainHtmlPath}${query}`;
 
-  console.log(`[STSen] Creating MainWindow with URL: ${targetUrl}`);
+  console.log(`[STSen] Creating MainWindow with URL: ${targetUrl} (headless: ${isHeadlessArg})`);
 
   mainWindow = new BrowserWindow({
     width: 820,
     height: 640,
     minWidth: 600,
     minHeight: 400,
+    show: !isHeadlessArg,
     title: `New NicoLive Helper (STSen) v${app.getVersion()}`,
     icon: path.join(__dirname, 'src', 'icons', 'icon-96.png'),
     webPreferences: getWebPreferences()
@@ -659,7 +754,7 @@ function createOrFocusMainWindow(lvid = '') {
     console.log(`[STSen] MainWindow did-finish-load: ${mainWindow.webContents.getURL()}`);
   });
 
-  if (!app.isPackaged) { mainWindow.webContents.openDevTools({ mode: 'detach' }); }
+  if (!app.isPackaged && !isHeadlessArg) { mainWindow.webContents.openDevTools({ mode: 'detach' }); }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -731,6 +826,25 @@ function createSubWindow(subUrl, options = {}) {
 // Chromium 系実機ブラウザ（Edge, Chrome, Brave, Vivaldi, Opera 等）の自動検出
 // -------------------------------------------------------------
 function getChromiumBrowserPath() {
+  if (process.platform !== 'win32') {
+    const linuxCandidates = [
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/microsoft-edge',
+      '/usr/bin/microsoft-edge-stable',
+      '/snap/bin/chromium'
+    ];
+    for (const p of linuxCandidates) {
+      if (fs.existsSync(p)) {
+        console.log(`[STSen:Browser] Detected Linux Chromium browser by path: ${p}`);
+        return p;
+      }
+    }
+    return null;
+  }
+
   const localAppData = process.env.LOCALAPPDATA || '';
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
   const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
@@ -769,35 +883,38 @@ function getChromiumBrowserPath() {
     }
   }
 
-  // 2. レジストリ（App Paths）からの検索フォールバック
-  const regNames = ['msedge.exe', 'chrome.exe', 'brave.exe', 'vivaldi.exe'];
-  for (const name of regNames) {
-    try {
-      const out = execSync(`reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
-        encoding: 'utf8',
-        windowsHide: true
-      });
-      const match = out.match(/REG_SZ\s+([^\r\n]+)/);
-      if (match && fs.existsSync(match[1].trim())) {
-        const found = match[1].trim();
-        console.log(`[STSen:Browser] Detected Chromium browser from registry: ${found}`);
-        return found;
-      }
-    } catch (e) {}
+  // 2. レジストリ（App Paths）からの検索フォールバック (Windowsのみ)
+  try {
+    const { execSync } = require('child_process');
+    const regNames = ['msedge.exe', 'chrome.exe', 'brave.exe', 'vivaldi.exe'];
+    for (const name of regNames) {
+      try {
+        const out = execSync(`reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
+          encoding: 'utf8',
+          windowsHide: true
+        });
+        const match = out.match(/REG_SZ\s+([^\r\n]+)/);
+        if (match && fs.existsSync(match[1].trim())) {
+          const found = match[1].trim();
+          console.log(`[STSen:Browser] Detected Chromium browser from registry: ${found}`);
+          return found;
+        }
+      } catch (e) {}
 
-    try {
-      const out = execSync(`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
-        encoding: 'utf8',
-        windowsHide: true
-      });
-      const match = out.match(/REG_SZ\s+([^\r\n]+)/);
-      if (match && fs.existsSync(match[1].trim())) {
-        const found = match[1].trim();
-        console.log(`[STSen:Browser] Detected Chromium browser from HKCU registry: ${found}`);
-        return found;
-      }
-    } catch (e) {}
-  }
+      try {
+        const out = execSync(`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
+          encoding: 'utf8',
+          windowsHide: true
+        });
+        const match = out.match(/REG_SZ\s+([^\r\n]+)/);
+        if (match && fs.existsSync(match[1].trim())) {
+          const found = match[1].trim();
+          console.log(`[STSen:Browser] Detected Chromium browser from HKCU registry: ${found}`);
+          return found;
+        }
+      } catch (e) {}
+    }
+  } catch (err) {}
 
   return null;
 }
@@ -1123,6 +1240,59 @@ ipcMain.handle('show-about-dialog', async () => {
   });
 });
 
+// -------------------------------------------------------------
+// リモートホスト関連 IPC
+// -------------------------------------------------------------
+ipcMain.on('remote-host-state-update', (event, state) => {
+  lastKnownState = Object.assign(lastKnownState, state);
+  if (remoteServer) {
+    remoteServer.broadcast('state-update', state);
+  }
+});
+
+ipcMain.on('remote-host-broadcast-event', (event, { type, data }) => {
+  if (remoteServer) {
+    remoteServer.broadcast(type, data);
+  }
+});
+
+ipcMain.handle('remote-server-update-config', async (event, { enabled, port, password }) => {
+  const store = loadStorageFile();
+  store.config = store.config || {};
+  if (enabled !== undefined) store.config['remote-server-enabled'] = enabled;
+  if (port !== undefined) store.config['remote-server-port'] = port;
+  if (password !== undefined) store.config['remote-server-password'] = password;
+  saveStorageFile(store);
+  initRemoteServer();
+  return {
+    running: remoteServer ? remoteServer.running : false,
+    port: remoteServer ? remoteServer.port : port,
+    hasPassword: !!(remoteServer && remoteServer.password)
+  };
+});
+
+ipcMain.handle('get-remote-server-status', async () => {
+  return {
+    running: remoteServer ? remoteServer.running : false,
+    port: remoteServer ? remoteServer.port : 18767,
+    hasPassword: !!(remoteServer && remoteServer.password)
+  };
+});
+
+// クライアント側（操作側）がホストに同期するためのCookie取得
+ipcMain.handle('get-cookies-for-sync', async () => {
+  const cookies = await session.defaultSession.cookies.get({ domain: 'nicovideo.jp' });
+  return cookies.map(c => ({
+    name: c.name,
+    value: c.value,
+    domain: c.domain,
+    path: c.path,
+    secure: c.secure,
+    httpOnly: c.httpOnly,
+    expirationDate: c.expirationDate
+  }));
+});
+
 // アプリ起動フロー
 app.whenReady().then(async () => {
   console.log('[STSen] App is ready.');
@@ -1131,6 +1301,7 @@ app.whenReady().then(async () => {
   await restoreSavedCookies();
 
   initWebSocketServer();
+  initRemoteServer();
 
   // 起動時に最新の放送中の配信に自動接続する設定をチェック
   let initialLvid = '';

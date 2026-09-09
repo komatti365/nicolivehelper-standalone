@@ -8,6 +8,8 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "start:host": "electron . --host",
+    "start:headless": "electron . --host --headless",
     "dist": "electron-builder --win nsis zip",
     "dist:installer": "electron-builder --win nsis",
     "dist:zip": "electron-builder --win zip"

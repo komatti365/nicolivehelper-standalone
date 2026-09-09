@@ -146,6 +146,11 @@ var NicoLiveStock = {
      * @returns {Promise<void>}
      */
     addStocks: async function( video_id ){
+        if (window.RemoteClient && window.RemoteClient.isConnected()) {
+            window.RemoteClient.sendAction('stock-add', { videoId: video_id });
+            $( '#input-stock-video' ).val( '' );
+            return;
+        }
         // console.log( video_id );
         if( video_id.length < 3 ) return;
         let l = video_id.match( /(sm|nm|so)\d+|\d{10}/g );
