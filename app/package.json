@@ -57,6 +57,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "remoteServer.js",
       "src/**/*",
       "node_modules/**/*",
       "package.json",
