@@ -38,9 +38,7 @@ var NicoLiveHelper = {
     // コメント送信に必要な要素
     ticket: '',
     threadId: '',
-    postkey: '',
-
-    chatbot_config: [],
+    is_premium: 0,
 
     _autoplay_timer: null,  ///< 自動再生用タイマー
     _remain_timer_format_type: 0,   ///< 再生中動画の時間表示フォーマット種別(0:残り時間,1:経過時間,2:動作再生終了時の枠残り時間)
@@ -195,61 +193,7 @@ var NicoLiveHelper = {
      * @param a8
      * @param a9
      */
-    enquete: function( q, a1, a2, a3, a4, a5, a6, a7, a8, a9 ){
-        if( !q || !a1 || !a2 ) return;
-        // アンケートを実装する
-        let url = `http://live2.nicovideo.jp/unama/api/v3/programs/${this.getLiveId()}/enquete`;
-        let xhr = CreateXHR( 'POST', url );
-        xhr.onreadystatechange = () => {
-            if( xhr.readyState != 4 ) return;
-            if( xhr.status != 200 ){
-                console.log( `${xhr.status} ${xhr.responseText}` );
-                return;
-            }
-        };
 
-        xhr.setRequestHeader( 'Content-type', 'application/json;charset=utf-8' );
-        xhr.setRequestHeader( 'X-Public-Api-Token', this.liveProp.site.relive.csrfToken );
-
-        let tmp = [a1, a2, a3, a4, a5, a6, a7, a8, a9];
-        let tmp2 = [];
-        for( let v of tmp ){
-            if( v ) tmp2.push( v );
-        }
-        let data = {
-            question: q,
-            items: tmp2
-        };
-        xhr.send( JSON.stringify( data ) );
-    },
-
-    enqueteShowResult: function(){
-        let url = `http://live2.nicovideo.jp/unama/api/v3/programs/${this.getLiveId()}/enquete/show_result`;
-        let xhr = CreateXHR( 'POST', url );
-        xhr.onreadystatechange = () => {
-            if( xhr.readyState != 4 ) return;
-            if( xhr.status != 200 ){
-                console.log( `${xhr.status} ${xhr.responseText}` );
-                return;
-            }
-        };
-        xhr.setRequestHeader( 'X-Public-Api-Token', this.liveProp.site.relive.csrfToken );
-        xhr.send();
-    },
-
-    enqueteEnd: function(){
-        let url = `http://live2.nicovideo.jp/unama/api/v3/programs/${this.getLiveId()}/enquete/end`;
-        let xhr = CreateXHR( 'POST', url );
-        xhr.onreadystatechange = () => {
-            if( xhr.readyState != 4 ) return;
-            if( xhr.status != 200 ){
-                console.log( `${xhr.status} ${xhr.responseText}` );
-                return;
-            }
-        };
-        xhr.setRequestHeader( 'X-Public-Api-Token', this.liveProp.site.relive.csrfToken );
-        xhr.send();
-    },
 
 
     pingCommentServer: function(){
@@ -484,10 +428,6 @@ var NicoLiveHelper = {
                     let next = parseInt( this.currentVideo.length_ms / 1000 + Config['autoplay-interval'] );
                     this.setNextPlayTimer( next );
 
-                    if( Config['tweet-on-play'] && typeof Twitter !== 'undefined' ){
-                        let str = this.replaceMacros( Config['tweet-text'], this.currentVideo );
-                        Twitter.updateStatus( str );
-                    }
                     if( typeof Discord !== 'undefined' && Config['discord-on-play'] && Discord.webhookUrl ){
                         let str = this.replaceMacros( Config['discord-text'], this.currentVideo );
                         Discord.updateStatus( str );
@@ -699,37 +639,7 @@ var NicoLiveHelper = {
      * @returns {Promise<void>}
      */
     sendStartupComment: async function(){
-        if( !this.isCaster() ) return;
-        let liveprogress = GetCurrentTime() - this.live_begintime;
-        // 3分経過したらスタートアップコメントしない
-        if( liveprogress > 180 ) return;
-
-        let db = CCDB.initDB();
-
-        // コミュニティID、スタートアップコメント設定の順で連続コメントを探す
-        let keys = [];
-        let by_community = Config['startup-comment-by-community'];
-        if( by_community ){
-            keys.push( this.getCommunityId() );
-        }
-        if( Config['startup-comment'] ){
-            keys.push( Config['startup-comment'] );
-        }
-
-        let text;
-        for( let k of keys ){
-            let file = await db.ccfile.get( k );
-            text = file && file.text;
-            if( text ) break;
-        }
-        if( !text ) return;
-
-        let text_array = text.split( /\n|\r|\r\n/ );
-        for( let line of text_array ){
-            await Wait( 5000 );
-            console.log( line );
-            this.postCasterComment( line, '', '', false );
-        }
+        // Continuous comments feature was removed
     },
 
     /**
@@ -1173,31 +1083,7 @@ var NicoLiveHelper = {
         }
     },
 
-    processChatbot: function( chat ){
-        if( !this.isCaster() ) return;
-        if( !Config['enable-chatbot'] ) return;
-        for( let conf of this.chatbot_config ){
-            let from = conf.msg_from;
-            let keyword = conf.keyword;
-            let reply = conf.reply;
-            let regexp = conf.regexp;
 
-            if( regexp && chat.text_notag.match( new RegExp( keyword ) ) ||
-                !regexp && chat.text_notag.indexOf( keyword ) >= 0 ){
-                // 視聴者コメントの場合
-                if( from == 0 && (chat.premium == 0 || chat.premium == 1) ){
-                    this.postCasterComment( reply, '', '', false );
-                    break;
-                }
-                // それ以外の場合
-                if( from == 1 && (chat.premium != 0 && chat.premium != 1) ){
-                    if( chat.user_id == this.nico_user_id ) break;
-                    this.postCasterComment( reply, '', '', false );
-                    break;
-                }
-            }
-        }
-    },
 
     /**
      * 受信したコメントを処理する.
@@ -1238,7 +1124,6 @@ var NicoLiveHelper = {
                 }
             }
             if( chat.date < this.connecttime ) return;
-            this.processChatbot( chat );
 
             if( this.isCaster() ) return;
             this.processCasterComment( chat );
@@ -1273,7 +1158,6 @@ var NicoLiveHelper = {
                     );
                 }
             }
-            this.processChatbot( chat );
             break;
 
         default:
@@ -2359,11 +2243,17 @@ var NicoLiveHelper = {
             }
         };
 
-        $(document).on('click', '#btn-account-login', function(e){
+        $(document).on('click', '#btn-account-login', async function(e){
             e.preventDefault();
-            console.log('[STSen] Login button clicked');
+            console.log('[STSen] Login button clicked. window.stsen:', typeof window.stsen);
             if (window.stsen && window.stsen.openLoginWindow) {
-                window.stsen.openLoginWindow();
+                try {
+                    await window.stsen.openLoginWindow();
+                } catch (err) {
+                    console.error('[STSen] openLoginWindow error:', err);
+                }
+            } else {
+                console.warn('[STSen] window.stsen.openLoginWindow is unavailable!');
             }
         });
 
@@ -2415,6 +2305,13 @@ var NicoLiveHelper = {
             e.preventDefault();
             if (window.stsen && window.stsen.openConfigFolder) {
                 window.stsen.openConfigFolder();
+            }
+        });
+
+        $(document).on('click', '#menu-reset-all-data', function(e){
+            e.preventDefault();
+            if (window.stsen && window.stsen.resetAllData) {
+                window.stsen.resetAllData();
             }
         });
 
@@ -2680,17 +2577,7 @@ var NicoLiveHelper = {
             } );
         } );
 
-        // 連続コメントを開く
-        $( '#continuous-comment' ).on( 'click', ( ev ) => {
-            window.open( 'cc/continuouscomment.html', 'nicolivehelperx_cc',
-                'width=320,height=320,menubar=no,toolbar=no,location=no' );
-        } );
 
-        // アンケートを開く
-        $( '#enquete' ).on( 'click', ( ev ) => {
-            window.open( 'q/enquete.html', 'nicolivehelperx_enquete',
-                'width=480,height=320,menubar=no,toolbar=no,location=no' );
-        } );
 
         // コメントを保存する
         $( '#save-comment' ).on( 'click', ( ev ) => {
@@ -2878,27 +2765,16 @@ var NicoLiveHelper = {
         console.log( Config );
         this.updatePNameWhitelist();
 
-        result = await browser.storage.local.get( 'chatbot' );
-        this.chatbot_config = result.chatbot;
-
         // 設定が更新されたときの再読み込み
         browser.storage.onChanged.addListener( ( changes, area ) => {
             if( changes.config ){
                 MergeSimpleObject( Config, changes.config.newValue );
                 console.log( Config );
-                if( typeof Twitter !== 'undefined' ){
-                    Twitter.init(); // 認証トークンをConfigから読ませるために
-                }
                 if( typeof Discord !== 'undefined' ){
                     Discord.init(); // webhook URLをConfigから読み込む
                 }
                 NicoLiveRequest.loadNGVideo();
                 this.updatePNameWhitelist();
-            }
-            if( changes.chatbot ){
-                let newchatbot = changes.chatbot.newValue;
-                console.log( newchatbot );
-                this.chatbot_config = newchatbot;
             }
         } );
 
@@ -2921,9 +2797,6 @@ var NicoLiveHelper = {
 
         DB.initDB();
         Talker.init();
-        if( typeof Twitter !== 'undefined' ){
-            Twitter.init();
-        }
         if( typeof Discord !== 'undefined' ){
             Discord.init();
         }

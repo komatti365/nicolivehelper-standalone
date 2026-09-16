@@ -1,4 +1,3 @@
-process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 const { app, BrowserWindow, ipcMain, shell, session, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -76,13 +75,9 @@ if (fs.existsSync(OLD_COOKIE_FILE) && !fs.existsSync(COOKIE_FILE)) {
 }
 
 let mainWindow = null;
-let loginWindow = null;
 let latestLvid = '';
 const subWindows = new Map();
 const liveProp = {};
-const activeExtensions = new Set();
-let wss = null;
-const WS_PORT = 18765;
 
 let remoteServer = null;
 let lastKnownState = {};
@@ -137,6 +132,7 @@ async function updateCookies(cookies) {
       let domain = c.domain || '.nicovideo.jp';
       const cleanDomain = domain.startsWith('.') ? domain.substring(1) : domain;
       const url = `https://${cleanDomain}${c.path || '/'}`;
+      const exp = c.expirationDate !== undefined ? c.expirationDate : (c.expires !== undefined ? c.expires : undefined);
 
       await session.defaultSession.cookies.set({
         url: url,
@@ -146,13 +142,15 @@ async function updateCookies(cookies) {
         path: c.path || '/',
         secure: c.secure !== undefined ? c.secure : true,
         httpOnly: c.httpOnly !== undefined ? c.httpOnly : false,
-        expirationDate: c.expirationDate
+        expirationDate: exp
       });
 
       if (c.name === 'user_session' || c.name === 'user_session_secure') {
         userSessionCount++;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`[STSen] Failed to set cookie ${c.name}:`, e.message);
+    }
   }
 
   try {
@@ -192,14 +190,16 @@ async function getAccountStatus() {
   let userInfo = null;
   if (loggedIn) {
     try {
-      const cookieHeader = cachedCookies.map(c => `${c.name}=${c.value}`).join('; ');
+      const targetCookies = (cookies && cookies.length > 0) ? cookies : cachedCookies;
+      const cookieHeader = targetCookies.map(c => `${c.name}=${c.value}`).join('; ');
       const res = await fetch('https://nvapi.nicovideo.jp/v1/users/me', {
         headers: {
           'X-Frontend-Id': '6',
           'X-Frontend-Version': '0',
           'Cookie': cookieHeader,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        },
+        signal: AbortSignal.timeout(5000)
       });
       if (res.ok) {
         const json = await res.json();
@@ -257,101 +257,7 @@ async function logout() {
 }
 
 // -------------------------------------------------------------
-// 内蔵ブラウザによるニコニコ公式ログインウィンドウ
-// -------------------------------------------------------------
-function openLoginWindow() {
-  if (loginWindow && !loginWindow.isDestroyed()) {
-    loginWindow.show();
-    loginWindow.focus();
-    return;
-  }
-
-  loginWindow = new BrowserWindow({
-    width: 650,
-    height: 750,
-    minWidth: 450,
-    minHeight: 600,
-    parent: mainWindow || undefined,
-    modal: false,
-    title: 'ニコニコログイン - New NicoLive Helper',
-    icon: path.join(__dirname, 'src', 'icons', 'icon-96.png'),
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: false,
-      preload: path.join(__dirname, 'login-preload.js'),
-      webSecurity: true
-    }
-  });
-
-  loginWindow.setMenuBarVisibility(false);
-
-  // 実機 Chrome と完全一致する自然な User-Agent (Electron 痕跡を除去)
-  const defaultUA = loginWindow.webContents.getUserAgent();
-  const cleanUA = defaultUA
-    .replace(/new-nicolive-helper\/[^\s]+\s?/g, '')
-    .replace(/Electron\/[^\s]+\s?/g, '')
-    .trim();
-  loginWindow.webContents.setUserAgent(cleanUA);
-  console.log('[STSen:Login] Using clean User-Agent:', cleanUA);
-
-  loginWindow.loadURL('https://account.nicovideo.jp/login?site=niconico');
-
-  let isChecking = false;
-  const checkLoginCookies = async () => {
-    if (isChecking) return false;
-    isChecking = true;
-    try {
-      const cookies = await session.defaultSession.cookies.get({ domain: 'nicovideo.jp' });
-      const hasUserSession = cookies.some(c => (c.name === 'user_session' || c.name === 'user_session_secure') && c.value);
-      if (hasUserSession) {
-        console.log('[STSen:Login] Detected user_session cookie! Saving session...');
-        await updateCookies(cookies);
-        broadcastAccountStatus();
-
-        setTimeout(() => {
-          if (loginWindow && !loginWindow.isDestroyed()) {
-            loginWindow.close();
-          }
-        }, 800);
-        return true;
-      }
-    } catch (e) {
-      console.error('[STSen:Login] Cookie check failed:', e);
-    } finally {
-      isChecking = false;
-    }
-    return false;
-  };
-
-  loginWindow.webContents.on('did-navigate', async (event, url) => {
-    console.log(`[STSen:Login] Navigated: ${url}`);
-    if (!url.includes('/login')) {
-      await checkLoginCookies();
-    }
-  });
-
-  loginWindow.webContents.on('did-navigate-in-page', async (event, url) => {
-    if (!url.includes('/login')) {
-      await checkLoginCookies();
-    }
-  });
-
-  const cookieChangeListener = async (event, cookie, cause, removed) => {
-    if (!removed && (cookie.name === 'user_session' || cookie.name === 'user_session_secure')) {
-      console.log(`[STSen:Login] Cookie event: ${cookie.name} set!`);
-      await checkLoginCookies();
-    }
-  };
-  session.defaultSession.cookies.on('changed', cookieChangeListener);
-
-  loginWindow.on('closed', () => {
-    loginWindow = null;
-    session.defaultSession.cookies.removeListener('changed', cookieChangeListener);
-  });
-}
-
-// -------------------------------------------------------------
-// 配信情報の直接取得 (拡張機能なしでの枠読み込み対応)
+// 配信情報の直接取得 (枠読み込み対応)
 // -------------------------------------------------------------
 async function fetchLiveInfoDirect(lvid) {
   const strId = String(lvid).trim();
@@ -492,150 +398,34 @@ function setupRequestHeaderInterceptor() {
 
     callback({ requestHeaders: details.requestHeaders });
   });
-}
 
-// -------------------------------------------------------------
-// WebSocket サーバー (ポート 18765)
-// -------------------------------------------------------------
-function initWebSocketServer() {
-  try {
-    wss = new WebSocket.Server({
-      port: WS_PORT,
-      verifyClient: () => true
-    });
-
-    console.log(`[STSen WebSocket] Server listening on ws://127.0.0.1:${WS_PORT}`);
-
-    wss.on('connection', (ws, req) => {
-      const ip = req.socket.remoteAddress;
-      console.log(`[STSen WebSocket] Browser extension connected from ${ip}`);
-      activeExtensions.add(ws);
-
-      ws.on('message', async (message) => {
-        try {
-          const data = JSON.parse(message.toString());
-          await handleExtensionMessage(data, ws);
-        } catch (err) {
-          console.error('[STSen WebSocket] Message parse error:', err);
-        }
-      });
-
-      ws.on('close', () => {
-        console.log('[STSen WebSocket] Browser extension disconnected');
-        activeExtensions.delete(ws);
-      });
-
-      ws.on('error', (err) => {
-        console.error('[STSen WebSocket] Socket error:', err);
-        activeExtensions.delete(ws);
-      });
-
-      ws.send(JSON.stringify({ cmd: 'welcome', version: '1.0.0' }));
-    });
-
-    wss.on('error', (err) => {
-      console.error('[STSen WebSocket] Server error:', err);
-    });
-  } catch (err) {
-    console.error('[STSen WebSocket] Failed to start WebSocket server:', err);
-  }
-}
-
-async function handleExtensionMessage(data, ws) {
-  if (!data || !data.cmd) return;
-
-  console.log(`[STSen WebSocket] Received cmd: ${data.cmd}`);
-
-  switch (data.cmd) {
-    case 'sync-cookies': {
-      if (Array.isArray(data.cookies)) {
-        console.log(`[STSen] Received ${data.cookies.length} cookies from browser extension.`);
-        const hasSession = await updateCookies(data.cookies);
-        broadcastAccountStatus();
-        if (hasSession && mainWindow && !mainWindow.isDestroyed()) {
-          console.log('[STSen] Cookies synced with user_session! Reloading window...');
-          mainWindow.webContents.reload();
-        }
+  // webSecurity: true 下で file:// からのニコニコ API 通信を可能にする CORS 補正
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = Object.assign({}, details.responseHeaders);
+    try {
+      const parsedUrl = new URL(details.url);
+      if (
+        parsedUrl.hostname.endsWith('nicovideo.jp') ||
+        parsedUrl.hostname.endsWith('nimg.jp') ||
+        parsedUrl.hostname.endsWith('dmc.nico')
+      ) {
+        responseHeaders['access-control-allow-origin'] = ['*'];
+        responseHeaders['access-control-allow-headers'] = ['*'];
+        responseHeaders['access-control-allow-methods'] = ['GET, POST, PUT, PATCH, DELETE, OPTIONS'];
+        responseHeaders['access-control-allow-credentials'] = ['true'];
       }
-      break;
-    }
-
-    case 'put-liveinfo': {
-      const liveinfo = data.liveinfo;
-      if (liveinfo && liveinfo.program && liveinfo.program.nicoliveProgramId) {
-        const rawId = String(liveinfo.program.nicoliveProgramId);
-        const idWithLv = rawId.startsWith('lv') ? rawId : `lv${rawId}`;
-        const idWithoutLv = rawId.replace(/^lv/, '');
-
-        latestLvid = idWithLv;
-        liveProp[rawId] = liveinfo;
-        liveProp[idWithLv] = liveinfo;
-        liveProp[idWithoutLv] = liveinfo;
-
-        console.log(`[STSen] Cached liveinfo for keys: "${rawId}", "${idWithLv}", "${idWithoutLv}"`);
-        console.log(`[STSen] Program title: "${liveinfo.program.title}"`);
-        console.log(`[STSen] Community ID: "${liveinfo.community ? liveinfo.community.id : 'official'}"`);
-
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          const currentUrl = mainWindow.webContents.getURL();
-          console.log(`[STSen] Current Window URL: ${currentUrl}`);
-
-          if (!currentUrl.includes(`lv=${idWithLv}`) && !currentUrl.includes(`lv=${idWithoutLv}`)) {
-            const mainHtmlPath = path.join(__dirname, 'src', 'main', 'main.html');
-            const targetUrl = `file://${mainHtmlPath}?lv=${idWithLv}`;
-            console.log(`[STSen] >>> Auto-navigating main window to: ${targetUrl}`);
-            mainWindow.loadURL(targetUrl);
-          } else {
-            console.log('[STSen] Main window is already at this live. Forwarding message to renderer.');
-            mainWindow.webContents.send('from-extension', data);
-          }
-        } else {
-          console.log('[STSen] Main window does not exist yet. Creating with lvid:', idWithLv);
-          createOrFocusMainWindow(idWithLv);
-        }
-      }
-      break;
-    }
-
-    case 'open-nicolivehelper': {
-      const lvid = data.request_id || latestLvid || 'lv0';
-      console.log(`[STSen] open-nicolivehelper requested for: ${lvid}`);
-      createOrFocusMainWindow(lvid);
-      break;
-    }
-
-    case 'playvideo': {
-      console.log(`[STSen] playvideo: sm${data.video_id} for ${data.lvid}`);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('from-extension', data);
-      }
-      break;
-    }
-
-    default:
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('from-extension', data);
-      }
-      break;
-  }
-}
-
-function broadcastToExtensions(data) {
-  const jsonStr = JSON.stringify(data);
-  for (const client of activeExtensions) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(jsonStr);
-    }
-  }
+    } catch (e) {}
+    callback({ responseHeaders });
+  });
 }
 
 function getWebPreferences() {
   return {
     preload: path.join(__dirname, 'preload.js'),
     nodeIntegration: false,
-    contextIsolation: false,
-    webSecurity: false,
-    allowRunningInsecureContent: true
+    contextIsolation: true,
+    webSecurity: true,
+    allowRunningInsecureContent: false
   };
 }
 
@@ -921,11 +711,22 @@ function getChromiumBrowserPath() {
 
 let edgeLoginProcess = null;
 let edgeCdpWs = null;
+let edgeLoginTimeout = null;
 
 async function openEdgeLogin() {
+  console.log('[STSen:EdgeLogin] openEdgeLogin() called');
   if (edgeLoginProcess) {
-    console.log('[STSen:EdgeLogin] Edge login process is already running.');
-    return;
+    console.log('[STSen:EdgeLogin] Previous Edge process detected. Restarting for fresh login attempt...');
+    try { edgeLoginProcess.kill(); } catch (e) {}
+    edgeLoginProcess = null;
+    if (edgeCdpWs) {
+      try { edgeCdpWs.close(); } catch (e) {}
+      edgeCdpWs = null;
+    }
+    if (edgeLoginTimeout) {
+      clearTimeout(edgeLoginTimeout);
+      edgeLoginTimeout = null;
+    }
   }
 
   const edgeExe = getChromiumBrowserPath();
@@ -938,7 +739,7 @@ async function openEdgeLogin() {
       cancelId: 1,
       title: 'ブラウザが見つかりません - New NicoLive Helper',
       message: 'ログインに必要なブラウザ（Microsoft Edge または Google Chrome 等）が見つかりませんでした。',
-      detail: 'Cloudflare Turnstile等のセキュリティ認証を安全に通過してログインを完了するため、Google Chromeのインストールをおすすめします。\\n\\n公式ダウンロードページを開きますか？'
+      detail: 'Cloudflare Turnstile等のセキュリティ認証を安全に通過してログインを完了するため、Google Chromeのインストールをおすすめします。\n\n公式ダウンロードページを開きますか？'
     });
 
     if (result.response === 0) {
@@ -952,27 +753,53 @@ async function openEdgeLogin() {
     fs.mkdirSync(browserProfileDir, { recursive: true });
   }
 
-  const CDP_PORT = 18766;
+  // 固定ポートではなくランダムな動的ポートを使用（無認証CDPへの不正アクセス防止）
+  const CDP_PORT = Math.floor(Math.random() * (65535 - 49152 + 1)) + 49152;
   const args = [
     `--remote-debugging-port=${CDP_PORT}`,
+    '--remote-debugging-address=127.0.0.1',
     `--user-data-dir=${browserProfileDir}`,
     '--no-first-run',
     '--no-default-browser-check',
+    '--disable-sync',
+    '--disable-features=msEdgeSyncPrompt,msFirstRun',
+    '--window-size=600,750',
     '--app=https://account.nicovideo.jp/login?site=niconico'
   ];
 
-  console.log(`[STSen:EdgeLogin] Launching Edge: ${edgeExe}`);
+  console.log(`[STSen:EdgeLogin] Launching browser: ${edgeExe} on port ${CDP_PORT}`);
   const { spawn } = require('child_process');
   edgeLoginProcess = spawn(edgeExe, args);
 
+  // 3分間のタイムアウト保護（放置された場合の自動終了）
+  edgeLoginTimeout = setTimeout(() => {
+    if (edgeLoginProcess) {
+      console.log('[STSen:EdgeLogin] Login process timed out (3 minutes). Closing browser.');
+      try { edgeLoginProcess.kill(); } catch (e) {}
+      edgeLoginProcess = null;
+    }
+    if (edgeCdpWs) {
+      try { edgeCdpWs.close(); } catch (e) {}
+      edgeCdpWs = null;
+    }
+  }, 180000);
+
   edgeLoginProcess.on('error', (err) => {
-    console.error('[STSen:EdgeLogin] Failed to start Edge process:', err);
+    console.error('[STSen:EdgeLogin] Failed to start browser process:', err);
     edgeLoginProcess = null;
+    if (edgeLoginTimeout) {
+      clearTimeout(edgeLoginTimeout);
+      edgeLoginTimeout = null;
+    }
   });
 
   edgeLoginProcess.on('exit', (code) => {
-    console.log(`[STSen:EdgeLogin] Edge process exited with code: ${code}`);
+    console.log(`[STSen:EdgeLogin] Browser process exited with code: ${code}`);
     edgeLoginProcess = null;
+    if (edgeLoginTimeout) {
+      clearTimeout(edgeLoginTimeout);
+      edgeLoginTimeout = null;
+    }
     if (edgeCdpWs) {
       try { edgeCdpWs.close(); } catch (e) {}
       edgeCdpWs = null;
@@ -980,7 +807,7 @@ async function openEdgeLogin() {
   });
 
   let attempts = 0;
-  const maxAttempts = 30;
+  const maxAttempts = 40;
   const pollInterval = 500;
 
   const waitForCdp = async () => {
@@ -990,9 +817,11 @@ async function openEdgeLogin() {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
       if (res.ok) {
         const targets = await res.json();
-        const pageTarget = targets.find(t => t.type === 'page');
+        const pageTarget = targets.find(t => t.type === 'page' && t.url && t.url.includes('nicovideo.jp'))
+          || targets.find(t => t.type === 'page' && !t.url.startsWith('edge://') && !t.url.startsWith('chrome://'));
+
         if (pageTarget && pageTarget.webSocketDebuggerUrl) {
-          console.log('[STSen:EdgeLogin] Found page target, connecting to CDP WebSocket...');
+          console.log(`[STSen:EdgeLogin] Found page target (${pageTarget.url}), connecting to CDP WebSocket...`);
           startCdpMonitoring(pageTarget.webSocketDebuggerUrl);
           return;
         }
@@ -1003,11 +832,11 @@ async function openEdgeLogin() {
     if (attempts < maxAttempts && edgeLoginProcess) {
       setTimeout(waitForCdp, pollInterval);
     } else if (edgeLoginProcess) {
-      console.warn('[STSen:EdgeLogin] Timed out waiting for CDP port.');
+      console.warn('[STSen:EdgeLogin] Timed out waiting for CDP port or login target.');
     }
   };
 
-  setTimeout(waitForCdp, 1000);
+  setTimeout(waitForCdp, 600);
 }
 
 function startCdpMonitoring(wsUrl) {
@@ -1022,15 +851,14 @@ function startCdpMonitoring(wsUrl) {
   let msgId = 1;
 
   edgeCdpWs.on('open', () => {
-    console.log('[STSen:EdgeLogin] Connected to CDP WebSocket! Starting cookie check...');
+    console.log('[STSen:EdgeLogin] Connected to CDP WebSocket! Starting cookie monitoring...');
     edgeCdpWs.send(JSON.stringify({ id: msgId++, method: 'Network.enable' }));
 
     checkTimer = setInterval(() => {
       if (edgeCdpWs && edgeCdpWs.readyState === WebSocket.OPEN) {
         edgeCdpWs.send(JSON.stringify({
           id: 100,
-          method: 'Network.getCookies',
-          params: { urls: ['https://nicovideo.jp', 'https://account.nicovideo.jp'] }
+          method: 'Network.getAllCookies'
         }));
       }
     }, 1000);
@@ -1043,16 +871,19 @@ function startCdpMonitoring(wsUrl) {
         const cookies = data.result.cookies;
         const userSession = cookies.find(c => (c.name === 'user_session' || c.name === 'user_session_secure') && c.value);
         if (userSession) {
-          console.log('[STSen:EdgeLogin] user_session detected in Edge! Saving session...');
-          clearInterval(checkTimer);
+          console.log('[STSen:EdgeLogin] user_session detected in browser! Saving session...');
+          if (checkTimer) {
+            clearInterval(checkTimer);
+            checkTimer = null;
+          }
 
-          await updateCookies(cookies);
+          const nicoCookies = cookies.filter(c => c.domain && c.domain.includes('nicovideo.jp'));
+          await updateCookies(nicoCookies.length > 0 ? nicoCookies : cookies);
           broadcastAccountStatus();
 
-          // 1秒待ってEdgeを自動クローズ
           setTimeout(() => {
             if (edgeLoginProcess) {
-              console.log('[STSen:EdgeLogin] Closing Edge window automatically.');
+              console.log('[STSen:EdgeLogin] Closing browser window automatically.');
               try { edgeLoginProcess.kill(); } catch (e) {}
               edgeLoginProcess = null;
             }
@@ -1066,13 +897,19 @@ function startCdpMonitoring(wsUrl) {
 
   edgeCdpWs.on('close', () => {
     console.log('[STSen:EdgeLogin] CDP WebSocket closed.');
-    clearInterval(checkTimer);
+    if (checkTimer) {
+      clearInterval(checkTimer);
+      checkTimer = null;
+    }
     edgeCdpWs = null;
   });
 
   edgeCdpWs.on('error', (err) => {
     console.error('[STSen:EdgeLogin] CDP WebSocket error:', err.message);
-    clearInterval(checkTimer);
+    if (checkTimer) {
+      clearInterval(checkTimer);
+      checkTimer = null;
+    }
     edgeCdpWs = null;
   });
 }
@@ -1133,6 +970,117 @@ ipcMain.handle('open-config-folder', () => {
   shell.openPath(CONFIG_DIR);
 });
 
+ipcMain.handle('reset-all-data', async () => {
+  const focusedWin = BrowserWindow.getFocusedWindow() || mainWindow;
+  const result = await dialog.showMessageBox(focusedWin || null, {
+    type: 'warning',
+    title: 'アプリの完全初期化',
+    message: 'すべての設定、ログイン情報、保存データを完全に初期化しますか？',
+    detail: '以下のデータが完全に消去されます：\n・保存された設定（storage.json）\n・ログインセッション／Cookie（cookies.json）\n・過去の移行元データ（STSen-NicoLiveHelper）\n・ブラウザキャッシュおよびデータベース\n\n処理完了後、アプリケーションは自動的に終了します。この操作は取り消せません。',
+    buttons: ['完全初期化してアプリを終了', 'キャンセル'],
+    defaultId: 1,
+    cancelId: 1
+  });
+
+  if (result.response !== 0) {
+    return { cancelled: true };
+  }
+
+  console.log('[STSen:Reset] Starting full data reset...');
+
+  try {
+    // 1. サブウィンドウをすべて閉じる
+    for (const [_, subWin] of subWindows) {
+      if (subWin && !subWin.isDestroyed()) {
+        try { subWin.destroy(); } catch (e) {}
+      }
+    }
+    subWindows.clear();
+
+    // 2. メモリ上キャッシュを破棄
+    cachedCookies = [];
+    lastKnownState = {};
+
+    // 3. Chromium セッションデータを全クリア
+    try {
+      await session.defaultSession.clearStorageData();
+      await session.defaultSession.clearCache();
+      await session.defaultSession.clearAuthCache();
+    } catch (e) {
+      console.warn('[STSen:Reset] Failed to clear session data:', e.message);
+    }
+
+    // 4. 旧設定ディレクトリ (PREV_CONFIG_DIR) を完全削除
+    if (fs.existsSync(PREV_CONFIG_DIR)) {
+      try {
+        fs.rmSync(PREV_CONFIG_DIR, { recursive: true, force: true });
+        console.log('[STSen:Reset] Deleted PREV_CONFIG_DIR:', PREV_CONFIG_DIR);
+      } catch (e) {
+        console.error('[STSen:Reset] Failed to delete PREV_CONFIG_DIR:', e);
+      }
+    }
+
+    // 5. 開発フォルダ内の旧 cookies.json があれば削除
+    if (fs.existsSync(OLD_COOKIE_FILE)) {
+      try {
+        fs.unlinkSync(OLD_COOKIE_FILE);
+        console.log('[STSen:Reset] Deleted old cookies.json in app directory.');
+      } catch (e) {}
+    }
+
+    // 6. 設定ファイルおよびディレクトリ内データの削除
+    if (fs.existsSync(COOKIE_FILE)) {
+      try { fs.unlinkSync(COOKIE_FILE); } catch (e) {}
+    }
+    if (fs.existsSync(STORAGE_FILE)) {
+      try { fs.unlinkSync(STORAGE_FILE); } catch (e) {}
+    }
+
+    const browserProfileDir = path.join(CONFIG_DIR, 'browser-profile');
+    if (fs.existsSync(browserProfileDir)) {
+      try { fs.rmSync(browserProfileDir, { recursive: true, force: true }); } catch (e) {}
+    }
+
+    // CONFIG_DIR 配下の全ファイルを可能な限り削除
+    if (fs.existsSync(CONFIG_DIR)) {
+      try {
+        const entries = fs.readdirSync(CONFIG_DIR);
+        for (const entry of entries) {
+          const target = path.join(CONFIG_DIR, entry);
+          try {
+            fs.rmSync(target, { recursive: true, force: true });
+          } catch (err) {
+            console.warn(`[STSen:Reset] Note: could not remove locked item ${entry}:`, err.message);
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 7. 完了ダイアログの表示
+    await dialog.showMessageBox({
+      type: 'info',
+      title: '初期化完了',
+      message: 'すべての設定とデータを完全に消去しました。',
+      detail: 'アプリケーションを終了します。次回起動時は初期状態で起動します。',
+      buttons: ['OK']
+    });
+
+    console.log('[STSen:Reset] Reset complete. Exiting application now.');
+    app.exit(0);
+    return { success: true };
+  } catch (err) {
+    console.error('[STSen:Reset] Unexpected error during reset:', err);
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'エラー',
+      message: '完全初期化中にエラーが発生しました。',
+      detail: err.message,
+      buttons: ['OK']
+    });
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('get-liveinfo', async (event, lvid) => {
   console.log(`[IPC:get-liveinfo] Requested for lvid: "${lvid}"`);
   const strId = String(lvid);
@@ -1147,8 +1095,15 @@ ipcMain.handle('get-liveinfo', async (event, lvid) => {
 
 ipcMain.handle('get-all-liveinfo', () => liveProp);
 
-ipcMain.handle('open-login-window', () => {
-  openEdgeLogin();
+ipcMain.handle('open-login-window', async () => {
+  console.log('[STSen] IPC: open-login-window received. Starting browser login...');
+  try {
+    await openEdgeLogin();
+    return { success: true };
+  } catch (err) {
+    console.error('[STSen] Error during openEdgeLogin():', err);
+    return { success: false, error: err.message };
+  }
 });
 
 ipcMain.handle('logout', async () => {
@@ -1200,9 +1155,7 @@ ipcMain.handle('load-live', async (event, lvid) => {
   createOrFocusMainWindow(idWithLv);
 });
 
-ipcMain.on('to-extension', (event, data) => {
-  broadcastToExtensions(data);
-});
+
 
 ipcMain.handle('open-subwindow', (event, { url, width, height, title }) => {
   createSubWindow(url, { width, height, title });
@@ -1300,7 +1253,6 @@ app.whenReady().then(async () => {
   setupRequestHeaderInterceptor();
   await restoreSavedCookies();
 
-  initWebSocketServer();
   initRemoteServer();
 
   // 起動時に最新の放送中の配信に自動接続する設定をチェック

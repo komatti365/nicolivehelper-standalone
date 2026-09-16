@@ -22,11 +22,11 @@
 
 var NicoApi = {
     // niconico.comで生放送するときにアクセスする先のドメイン
-    live_base_uri_en: "http://watch.live.niconico.com/api/",
-    live_base_uri_jp: "http://watch.live.nicovideo.jp/api/",
+    live_base_uri_en: "https://watch.live.niconico.com/api/",
+    live_base_uri_jp: "https://watch.live.nicovideo.jp/api/",
     live_base_uri: "",
-    base_uri_jp: "http://www.nicovideo.jp/",
-    base_uri_en: "http://video.niconico.com/",
+    base_uri_jp: "https://www.nicovideo.jp/",
+    base_uri_en: "https://video.niconico.com/",
     base_uri: "",
 
     nicoapi_header: {
@@ -69,52 +69,9 @@ var NicoApi = {
         }
     },
 
-    // ニコニコ動画のAPIトークンを取得する
-    // postfunc には func(token) を受け取る関数を渡す
-    getApiToken: function( url, postfunc ){
-        let f = function( xml, xmlhttp ){
-            if( xmlhttp.readyState == 4 ){
-                if( xmlhttp.status == 200 ){
-                    try{
-                        let token = xmlhttp.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                        if( !token ){
-                            token = xmlhttp.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                        }
-                        token = token[1];
-                        if( "function" == typeof postfunc ){
-                            postfunc( token );
-                        }
-                        console.log( "Token:" + token );
-                    }catch( x ){
-                        console.log( x );
-                    }
-                }
-            }
-        };
-        this.callApi( url, f );
-    },
-
-    getpostkey: function( thread, block_no, uselc, lang_flag, locale_flag, seat_flag, postfunc ){
-        let url = this.live_base_uri + "getpostkey?thread=" + thread + "&block_no=" + block_no + "&uselc=" + uselc + "&lang_flag=" + lang_flag + "&locale_flag=" + locale_flag + "&seat_flag=" + seat_flag;
-        this.callApi( url, postfunc );
-    },
-
     getthumbinfo: function( video_id, postfunc ){
-        let url = "http://ext.nicovideo.jp/api/getthumbinfo/" + video_id;
+        let url = "https://ext.nicovideo.jp/api/getthumbinfo/" + video_id;
         this.callApi( url, postfunc );
-    },
-
-    heartbeat: function( postdata, postfunc ){
-        let url = this.live_base_uri + "heartbeat";
-        this.callApi( url, postfunc, postdata );
-    },
-    getremainpoint: function( postfunc ){
-        let url = this.live_base_uri + "getremainpoint";
-        this.callApi( url, postfunc );
-    },
-    usepoint: function( postdata, postfunc ){
-        let url = this.live_base_uri + "usepoint";
-        this.callApi( url, postfunc, postdata );
     },
 
     mylistRSS: function( mylist_id, postfunc ){
@@ -133,29 +90,6 @@ var NicoApi = {
         this.callApi( url, postfunc, null, this.nicoapi_header );
     },
 
-    addDeflist: function( item_id, token, additional_msg, postfunc ){
-        let url = this.base_uri + "api/deflist/add";
-        let reqstr = [];
-        reqstr[0] = "item_id=" + encodeURIComponent( item_id );
-        reqstr[1] = "description=" + encodeURIComponent( additional_msg );
-        reqstr[2] = "token=" + encodeURIComponent( token );
-        reqstr[3] = "item_type=0";
-        this.callApi( url, postfunc, reqstr );
-    },
-    addMylist: function( item_id, mylist_id, token, additional_msg, postfunc ){
-        let url = this.base_uri + "api/mylist/add";
-        let reqstr = [];
-        reqstr[0] = "group_id=" + encodeURIComponent( mylist_id );
-        reqstr[1] = "item_type=0"; // 0 means video.
-        reqstr[2] = "item_id=" + encodeURIComponent( item_id );
-        reqstr[3] = "description=" + encodeURIComponent( additional_msg );
-        reqstr[4] = "token=" + encodeURIComponent( token );
-        this.callApi( url, postfunc, reqstr );
-    },
-    getMylistToken: function( video_id, postfunc ){
-        let url = this.base_uri + "mylist_add/video/" + video_id;
-        this.callApi( url, postfunc );
-    },
 
     /**
      * あとで見る（とりあえずマイリスト）に登録してある動画一覧を得る.
@@ -184,93 +118,6 @@ var NicoApi = {
         this.callApi( url, postfunc, null, this.nicoapi_header );
     },
 
-    /**
-     * マイリストからマイリストへコピー
-     */
-    copymylist: function( from_id, to_id, ids, token, postfunc ){
-        let url = this.base_uri + "api/mylist/copy";
-        let data = [];
-        data[0] = "group_id=" + from_id;
-        data[1] = "target_group_id=" + to_id;
-        data[2] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[3 + i] = "id_list[0][]=" + ids[i];
-        }
-
-        this.callApi( url, postfunc, data );
-    },
-    /**
-     * とりマイからマイリストへコピー
-     */
-    copydeflist: function( to_id, ids, token, postfunc ){
-        let url = this.base_uri + "api/deflist/copy";
-        let data = [];
-        data[0] = "target_group_id=" + to_id;
-        data[1] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[2 + i] = "id_list[0][]=" + ids[i];
-        }
-        this.callApi( url, postfunc, data );
-    },
-
-    /**
-     * マイリストからマイリストへ移動
-     */
-    movemylist: function( from_id, to_id, ids, token, postfunc ){
-        let url = this.base_uri + "api/mylist/move";
-        let data = [];
-        data[0] = "group_id=" + from_id;
-        data[1] = "target_group_id=" + to_id;
-        data[2] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[3 + i] = "id_list[0][]=" + ids[i];
-        }
-
-        this.callApi( url, postfunc, data );
-    },
-    /**
-     * とりマイからマイリストへ移動
-     */
-    movedeflist: function( to_id, ids, token, postfunc ){
-        let url = this.base_uri + "api/deflist/move";
-        let data = [];
-        data[0] = "target_group_id=" + to_id;
-        data[1] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[2 + i] = "id_list[0][]=" + ids[i];
-        }
-        this.callApi( url, postfunc, data );
-    },
-
-    /**
-     * マイリストの動画を削除
-     */
-    deletemylist: function( from_id, ids, token, postfunc ){
-        let url = this.base_uri + "api/mylist/delete";
-        let data = [];
-        data[0] = "group_id=" + from_id;
-        data[1] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[2 + i] = "id_list[0][]=" + ids[i];
-        }
-        this.callApi( url, postfunc, data );
-    },
-    /**
-     * とりマイの動画を削除
-     */
-    deletedeflist: function( ids, token, postfunc ){
-        let url = this.base_uri + "api/deflist/delete";
-        let data = [];
-        data[0] = "token=" + token;
-        for( let i = 0; i < ids.length; i++ ){
-            data[1 + i] = "id_list[0][]=" + ids[i];
-        }
-        this.callApi( url, postfunc, data );
-    },
-
-    getUserMylistPageApiToken: function( postfunc ){
-        this.callApi( this.base_uri + "my/mylist", postfunc );
-    },
 
     /**
      * ログイン中のユーザー情報を取得する

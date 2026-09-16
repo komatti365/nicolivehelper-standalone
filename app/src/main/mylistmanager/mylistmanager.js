@@ -393,52 +393,6 @@ let MyListManager = {
     },
 
     getToken: function(){
-        let f = function( xml, req ){
-            if( req.readyState == 4 ){
-                if( req.status == 200 ){
-                    let token = req.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                    if( !token ){
-                        token = req.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                    }
-                    MyListManager.apitoken = token;
-                }
-            }
-        };
-        NicoApi.getUserMylistPageApiToken( f );
-    },
-
-    // TODO リクエスト追加処理を作成する
-    addRequest: function(){
-        let items = $( 'folder-item-listbox' ).children;
-        let str = "";
-        let id = $( 'folder-listbox' ).selectedItem.value;
-        let key = "_" + id;
-
-        let videos = this.mylistdata[key].mylistitem;
-        for( let i = 0; i < items.length; i++ ){
-            if( !items[i].selected ) continue;
-            str += videos[i].item_data.video_id + " ";
-        }
-        if( window.opener.NicoLiveHelper.iscaster || window.opener.NicoLiveHelper.isOffline() ){
-            window.opener.NicoLiveRequest.addRequest( str );
-        }else{
-            window.opener.NicoLiveHelper.postListenerComment( str, "" );
-        }
-    },
-    // TODO ストック追加処理を作成する
-    addStock: function(){
-        let items = $( 'folder-item-listbox' ).children;
-        let str = "";
-        let id = $( 'folder-listbox' ).selectedItem.value;
-        let key = "_" + id;
-
-        let videos = this.mylistdata[key].mylistitem;
-        for( let i = 0; i < items.length; i++ ){
-            if( !items[i].selected ) continue;
-            str += videos[i].item_data.video_id + " ";
-        }
-        debugprint( str );
-        window.opener.NicoLiveStock.addStock( str );
     },
 
     // TODO マイリストに動画IDを直接指定して追加処理を呼び出す
@@ -518,25 +472,9 @@ let MyListManager = {
     },
 
     getMyListPageToken: function( postfunc ){
-        let f = function( xml, req ){
-            if( req.readyState == 4 ){
-                if( req.status == 200 ){
-                    let token = req.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                    if( !token ){
-                        token = req.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                    }
-
-                    MyListManager.apitoken = token[1];
-                    if( "function" == typeof postfunc ){
-                        postfunc();
-                    }
-                    token = req.responseText.match( /nickname = \"(.*)\";/ );
-                    debugprint( token[1] );
-                    $( 'statusbar-username' ).label = token[1];
-                }
-            }
-        };
-        NicoApi.getUserMylistPageApiToken( f );
+        if( "function" == typeof postfunc ){
+            postfunc();
+        }
     },
 
     /**
@@ -546,24 +484,7 @@ let MyListManager = {
      * @param ids
      */
     copy: function( from, to, ids ){
-        let f = function( xml, req ){
-            if( req.readyState == 4 ){
-                if( req.status == 200 ){
-                    let result = JSON.parse( req.responseText );
-                    if( result.status == "fail" ){
-                        SetStatusBarText( result.error.code + ": " + result.error.description );
-                    }else{
-                        SetStatusBarText( "コピーしました" );
-                    }
-                }
-            }
-        };
-
-        if( from == 'default' ){
-            NicoApi.copydeflist( to, ids, this.apitoken, f );
-        }else{
-            NicoApi.copymylist( from, to, ids, this.apitoken, f );
-        }
+        SetStatusBarText( "ニコニコの仕様変更により、マイリストのコピー操作は現在利用できません。" );
     },
 
     /**
@@ -619,23 +540,7 @@ let MyListManager = {
      * @param ids
      */
     move: function( from, to, ids ){
-        let f = function( xml, req ){
-            if( req.readyState == 4 ){
-                if( req.status == 200 ){
-                    let result = JSON.parse( req.responseText );
-                    if( result.status == "fail" ){
-                        SetStatusBarText( result.error.code + ": " + result.error.description );
-                    }else{
-                        MyListManager.moveListItem( from, to, result );
-                    }
-                }
-            }
-        };
-        if( from == 'default' ){
-            NicoApi.movedeflist( to, ids, this.apitoken, f );
-        }else{
-            NicoApi.movemylist( from, to, ids, this.apitoken, f );
-        }
+        SetStatusBarText( "ニコニコの仕様変更により、マイリストの移動操作は現在利用できません。" );
     },
 
     /**
@@ -711,47 +616,7 @@ let MyListManager = {
      * チェックした動画を削除する.
      */
     delete: function(){
-        if( !window.confirm( "選択した動画をマイリストから削除しますか?" ) ) return;
-
-        let items = $( '.mylist_item_selected' );
-        let id = $( '#mylist' ).val();
-        let key = "_" + id;
-        let str = "";
-
-        // マイリストのアイテムIDをスペースで区切ったものをテキストとしてD&Dする
-        let videos = this.mylistdata[key].mylistitem;
-        for( let i = 0; i < items.length; i++ ){
-            let ind = items[i].rowIndex;
-            str += videos[ind].item_id + " ";
-        }
-        let ids = str.trim().split( /\s+/ );
-        if( ids.length ){
-            let f = function(){
-                let f2 = function( xml, req ){
-                    if( req.readyState == 4 ){
-                        if( req.status == 200 ){
-                            let result = JSON.parse( req.responseText );
-                            if( result.status == "fail" ){
-                                SetStatusBarText( result.error.code + ": " + result.error.description );
-                            }else{
-                                SetStatusBarText( "削除しました" );
-                                MyListManager.deleteFromListItem( ids );
-                            }
-                        }
-                    }
-                };
-                if( id == 'default' ){
-                    NicoApi.deletedeflist( ids, MyListManager.apitoken, f2 );
-                }else{
-                    NicoApi.deletemylist( id, ids, MyListManager.apitoken, f2 );
-                }
-            };
-            if( !this.apitoken ){
-                this.getMyListPageToken( f );
-            }else{
-                f();
-            }
-        }
+        SetStatusBarText( "ニコニコの仕様変更により、マイリストからの動画削除は現在利用できません。" );
     },
 
     /**
@@ -781,74 +646,11 @@ let MyListManager = {
     },
 
     addMyListExec: function( item_id, mylist_id, token, video_id, additional_msg ){
-        // 二段階目は取得したトークンを使ってマイリス登録をする.
-        let f = function( xml, req ){
-            if( req.readyState == 4 && req.status == 200 ){
-                let result = JSON.parse( req.responseText );
-                switch( result.status ){
-                case 'ok':
-                    // TODO マイリスト追加経過表示
-                    let max = MyListManager.max;
-                    let processed = max - MyListManager.registerMylistQueue.length;
-                    SetStatusBarText( video_id + 'をマイリストしました。(' + processed + '/' + max + ')' );
-                    setTimeout( function(){
-                        MyListManager.runAddingMyList();
-                    }, 1000 );
-                    break;
-                case 'fail':
-                    if( result.error.code == 'EXIST' ){
-                        setTimeout( function(){
-                            MyListManager.runAddingMyList();
-                        }, 1000 );
-                    }else{
-                        MyListManager.finishAddingMyList();
-                    }
-                    SetStatusBarText( result.error.description + ", " + video_id );
-                    break;
-                default:
-                    break;
-                }
-            }
-        };
-        NicoApi.addMylist( item_id, mylist_id, token, additional_msg, f );
     },
 
     runAddingMyList: function(){
-        if( this.registerMylistQueue.length == 0 ){
-            this.finishAddingMyList();
-            this.refreshCurrentMylist();
-            return;
-        }
-        // TODO マイリス追加の経過表示プログレスバー
-        // $( 'statusbar-progressmeter' ).value = $( 'statusbar-progressmeter' ).max - this.registerMylistQueue.length;
-
-        let mylist_id = $( '#mylist' ).val();
-        let video_id = this.registerMylistQueue.shift();
-        if( mylist_id == 'default' ){
-            this.finishAddingMyList();
-            SetStatusBarText( "現在、あとで見るにはマイリスト登録できません。" );
-            return;
-        }
-
-        // 一段階目はトークンを取得する.
-        let f = function( xml, req ){
-            if( req.readyState == 4 && req.status == 200 ){
-                try{
-                    let token = req.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                    if( !token ){
-                        token = req.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                    }
-                    let item_id = req.responseText.match( /item_id\"\s*value=\"(.*)\">/ );
-                    debugprint( 'token=' + token[1] );
-                    debugprint( 'item_id=' + item_id[1] );
-                    MyListManager.addMyListExec( item_id[1], mylist_id, token[1], video_id, "" );
-                }catch( x ){
-                    MyListManager.finishAddingMyList();
-                    SetStatusBarText( "マイリスト登録に失敗しました: " + video_id );
-                }
-            }
-        };
-        NicoApi.getMylistToken( video_id, f );
+        this.finishAddingMyList();
+        SetStatusBarText( "ニコニコの仕様変更により、マイリストの追加操作は現在利用できません。" );
     },
 
     /**

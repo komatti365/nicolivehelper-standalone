@@ -122,118 +122,17 @@ var NicoLiveMylist = {
     },
 
     /**
-     * とりマイに追加する(本処理)
-     * @param video_id 動画ID
-     * @param item_id
-     * @param token
-     * @param additional_msg マイリストコメント
-     */
-    addDeflistExec: function( video_id, item_id, token, additional_msg ){
-        // 二段階目は取得したトークンを使ってマイリス登録をする.
-        let f = function( xml, xmlhttp ){
-            if( xmlhttp.readyState == 4 && xmlhttp.status == 200 ){
-                let result = JSON.parse( xmlhttp.responseText );
-                switch( result.status ){
-                case 'ok':
-                    NicoLiveHelper.showAlert( `${video_id}を"あとで見る"しました` );
-                    break;
-                case 'fail':
-                    NicoLiveHelper.showAlert( result.error.description );
-                    break;
-                default:
-                    break;
-                }
-            }
-        };
-        NicoApi.addDeflist( item_id, token, additional_msg, f );
-    },
-
-    /**
-     * とりマイに登録する.
-     * @param video_id 動画ID
-     * @param additional_msg マイリストコメント
+     * とりマイに登録する（非推奨/仕様変更済み）
      */
     addDeflist: function( video_id, additional_msg ){
-        // 一段階目はトークンを取得する.
-        if( !video_id ) return;
-        let f = function( xml, xmlhttp ){
-            if( xmlhttp.readyState == 4 && xmlhttp.status == 200 ){
-                try{
-                    let token = xmlhttp.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                    if( !token ){
-                        token = xmlhttp.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                    }
-                    let item_id = xmlhttp.responseText.match( /item_id\"\s*value=\"(.*)\">/ );
-                    token = token[1];
-                    item_id = item_id[1];
-                    NicoLiveMylist.addDeflistExec( video_id, item_id, token, additional_msg );
-                }catch( x ){
-                    console.log( x );
-                    NicoLiveHelper.showAlert( 'あとで見るに追加に失敗しました' );
-                }
-            }
-        };
-        NicoApi.getMylistToken( video_id, f );
+        NicoLiveHelper.showAlert( 'ニコニコの仕様変更により、本アプリからのマイリスト直接追加は現在サポートされていません。' );
     },
 
     /**
-     * マイリストに登録する(本処理)
-     * @param item_id
-     * @param mylist_id マイリストID
-     * @param token
-     * @param video_id 動画ID
-     * @param additional_msg マイリストコメント
-     */
-    addMyListExec: function( item_id, mylist_id, token, video_id, additional_msg ){
-        // 二段階目は取得したトークンを使ってマイリス登録をする.
-        let f = function( xml, req ){
-            if( req.readyState == 4 && req.status == 200 ){
-                let result = JSON.parse( req.responseText );
-                switch( result.status ){
-                case 'ok':
-                    NicoLiveHelper.showAlert( `${video_id}を「${NicoLiveMylist.getName( mylist_id )}」にマイリストしました` );
-                    break;
-                case 'fail':
-                    NicoLiveHelper.showAlert( result.error.description );
-                    break;
-                default:
-                    break;
-                }
-            }
-        };
-        NicoApi.addMylist( item_id, mylist_id, token, additional_msg, f );
-    },
-
-    /**
-     * マイリストに追加する.
-     * @param mylist_id マイリストID
-     * @param video_id 動画ID
-     * @param additional_msg 追加メッセージ
+     * マイリストに追加する（非推奨/仕様変更済み）
      */
     addMylist: function( mylist_id, video_id, additional_msg ){
-        console.log( `Add mylist: ${mylist_id}, ${video_id}` );
-
-        if( mylist_id == 'default' ){
-            this.addDeflist( video_id, additional_msg );
-        }else{
-            // 一段階目はトークンを取得する.
-            let f = function( xml, req ){
-                if( req.readyState == 4 && req.status == 200 ){
-                    try{
-                        let token = req.responseText.match( /NicoAPI\.token\s*=\s*\"(.*)\";/ );
-                        if( !token ){
-                            token = req.responseText.match( /NicoAPI\.token\s*=\s*\'(.*)\';/ );
-                        }
-                        let item_id = req.responseText.match( /item_id\"\s*value=\"(.*)\">/ );
-                        NicoLiveMylist.addMyListExec( item_id[1], mylist_id, token[1], video_id, additional_msg );
-                    }catch( x ){
-                        console.log( x );
-                        NicoLiveHelper.showAlert( 'マイリスト追加に失敗しました' );
-                    }
-                }
-            };
-            NicoApi.getMylistToken( video_id, f );
-        }
+        NicoLiveHelper.showAlert( 'ニコニコの仕様変更により、本アプリからのマイリスト直接追加は現在サポートされていません。' );
     },
 
     processMylistGroup: function(){

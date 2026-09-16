@@ -24,9 +24,7 @@
 var Config = {
     'play-default-volume': 50,
     'autoplay-interval': 10,
-    'startup-comment': '',
     'play-in-time': false,
-    'startup-comment-by-community': false,
     'auto-extend': false,
     'auto-start': false,
     'auto-start-quote': false,
@@ -51,7 +49,6 @@ var Config = {
     'auto-kotehan': false,
     'comment-dispay-lines': 500,
     'comment-backlog-num': 50,
-    'enable-chatbot': false,
 
     'max-request': 0,
     'request-send-reply': false,
@@ -71,9 +68,6 @@ var Config = {
     'ng-video-list': '',
     'request-max-request': '>>{comment_no} リクエスト回数超過しています',
 
-    'tweet-on-play': false,
-    'tweet-text': '再生中:{title} http://nico.ms/{id} #{id} http://nico.ms/{live-id}',
-    'twitter-screen-name': 'なし',
 
     /* Discord */
     'discord-on-play': false,
