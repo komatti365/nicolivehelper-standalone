@@ -13,7 +13,7 @@ async function initAccountSettings() {
           $('#opt-btn-logout').show();
         } else {
           $('#opt-account-status').text('未ログイン').css('color', '#dc3545');
-          $('#opt-account-details').text('※内蔵ブラウザでログインしてください');
+          $('#opt-account-details').text('※ブラウザでログインしてください');
           $('#opt-btn-login').text('ログイン');
           $('#opt-btn-logout').hide();
         }
@@ -63,7 +63,6 @@ async function initAccountSettings() {
  */
 
 
-var DB;
 
 function LoadValue( key, config, defvalue ){
     if( config[key] != undefined ){
@@ -117,36 +116,6 @@ let g_vinfo_defvalue = [
 ];
 
 
-function InitTwitterUI(){
-    if( typeof Twitter === 'undefined' ) return;
-    // 認証済みのスクリーン名
-    if( Twitter.getScreenName() ){
-        $( '#twitter-screen-name' ).text( "@" + Twitter.getScreenName() );
-    }
-
-    $( '#twitter-live_started' ).val( Config.twitter.live_started );
-    $( '#twitter-play_started' ).val( Config.twitter.play_started );
-    $( '#twitter-tweet_live_started' ).prop( 'checked', Config.twitter.tweet_live_started );
-    $( '#twitter-tweet_play_started' ).prop( 'checked', Config.twitter.tweet_play_started );
-
-    // PINを取得
-    $( '#btn-twitter-get-pin' ).on( 'click', ( ev ) => {
-        Twitter.getRequestToken();
-    } );
-
-    // 認証
-    $( '#btn-twitter-auth' ).on( 'click', ( ev ) => {
-        let pin = $( '#txt-twitter-pin' ).val();
-        // console.log(pin);
-        Twitter.getAccessToken( pin );
-    } );
-
-    // つぶやきテスト
-    $( '#btn-test-tweet' ).on( 'click', ( ev ) => {
-        let text = $( '#txt-tweet-test' ).val();
-        this.updateStatus( text );
-    } );
-}
 
 /**
  * 設定をロードして画面に反映.
@@ -176,9 +145,7 @@ async function LoadOptions(){
     /* 進行 */
     LoadValue( 'play-default-volume', config, Config['play-default-volume'] );
     LoadValue( 'autoplay-interval', config, Config['autoplay-interval'] );
-    LoadValue( 'startup-comment', config, Config['startup-comment'] );
     LoadBool( 'play-in-time', config, Config['play-in-time'] );
-    LoadBool( 'startup-comment-by-community', config, Config['startup-comment-by-community'] );
     LoadBool( 'auto-extend', config, Config['auto-extend'] );
     LoadBool( 'auto-start', config, Config['auto-start'] );
     LoadBool( 'auto-start-quote', config, Config['auto-start-quote'] );
@@ -214,7 +181,6 @@ async function LoadOptions(){
     LoadBool( 'auto-kotehan', config, false );
     LoadValue( 'comment-dispay-lines', config, 500 );
     LoadValue( 'comment-backlog-num', config, 50 );
-    LoadBool( 'enable-chatbot', config, false );
 
     /* 動画情報 */
     LoadValue( 'videoinfo-interval', config, 7 );
@@ -225,28 +191,6 @@ async function LoadOptions(){
     }
     LoadValue( 'pname-whitelist', config, '' );
 
-    /* Twitter */
-    LoadBool( 'tweet-on-play', config, Config['tweet-on-play'] );
-    LoadValue( 'tweet-text', config, Config['tweet-text'] );
-    LoadValue( 'oauth-token', config, '' );
-    LoadValue( 'oauth-secret-token', config, '' );
-
-    $( '#twitter-screen-name' ).text( config['twitter-screen-name'] );
-    /* Twitter認証 */
-    $( '#btn-twitter-get-pin' ).on( 'click', ( ev ) => {
-        if( typeof Twitter !== 'undefined' ){
-            Twitter.getRequestToken();
-        }
-    } );
-    $( '#btn-twitter-auth' ).on( 'click', async ( ev ) => {
-        if( typeof Twitter !== 'undefined' ){
-            let pin = $( '#txt-twitter-pin' ).val();
-            let result = await Twitter.getAccessToken( pin );
-            $( '#twitter-screen-name' ).text( `@${result['screen_name']}` );
-            $( '#oauth-token' ).val( result['oauth_token'] );
-            $( '#oauth-secret-token' ).val( result['oauth_token_secret'] );
-        }
-    } );
 
 
     /* Discord */
@@ -320,9 +264,7 @@ function SaveOptions( ev ){
     /* 進行 */
     SaveInt( 'play-default-volume', config );
     SaveInt( 'autoplay-interval', config );
-    SaveValue( 'startup-comment', config );
     SaveBool( 'play-in-time', config );
-    SaveBool( 'startup-comment-by-community', config );
     SaveBool( 'auto-extend', config );
     SaveBool( 'auto-start', config );
     SaveBool( 'auto-start-quote', config );
@@ -358,7 +300,6 @@ function SaveOptions( ev ){
     SaveBool( 'auto-kotehan', config );
     SaveInt( 'comment-dispay-lines', config );
     SaveInt( 'comment-backlog-num', config );
-    SaveBool( 'enable-chatbot', config );
 
     /* 動画情報 */
     SaveInt( 'videoinfo-interval', config );
@@ -367,12 +308,6 @@ function SaveOptions( ev ){
     }
     SaveValue( 'pname-whitelist', config );
 
-    /* Twitter */
-    SaveBool( 'tweet-on-play', config );
-    SaveValue( 'tweet-text', config );
-    SaveValue( 'oauth-token', config );
-    SaveValue( 'oauth-secret-token', config );
-    config['twitter-screen-name'] = $( '#twitter-screen-name' ).text();
 
     /* Discord */
     SaveBool( 'discord-on-play', config );
@@ -419,18 +354,7 @@ function SaveOptions( ev ){
 }
 
 window.addEventListener( 'load', async function( ev ){
-    DB = CCDB.initDB();
     Talker.init();
-
-    let result = await DB.ccfile.toArray();
-
-    let sel = $( '#startup-comment' );
-    for( let f of result ){
-        let option = document.createElement( 'option' );
-        $( option ).text( f.filename );
-        $( option ).val( f.filename );
-        sel.append( option );
-    }
 
     LoadOptions();
     initAccountSettings();
@@ -454,6 +378,14 @@ window.addEventListener( 'load', async function( ev ){
             window.stsen.openConfigFolder();
         }
     } );
+
+    const handleResetAllData = () => {
+        if ( window.stsen && window.stsen.resetAllData ) {
+            window.stsen.resetAllData();
+        }
+    };
+    $( '#btn-reset-all-data' ).on( 'click', handleResetAllData );
+    $( '#btn-reset-all-data-bottom' ).on( 'click', handleResetAllData );
 
     $( '#opt-version-badge' ).on( 'click', () => {
         if ( window.stsen && window.stsen.showAboutDialog ) {

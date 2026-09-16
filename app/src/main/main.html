@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' file: data: blob: https: wss: ws:;">
   <title>New NicoLive Helper</title>
 
   <link rel="stylesheet" href="../libs/external/bootstrap/bootstrap.css">
   <link rel="stylesheet" href="../libs/external/jquery-ui-1.12.1/jquery-ui.css">
   <link rel="stylesheet" href="../libs/external/jquery.contextMenu.css">
-  <script src="../libs/browser-polyfill.js"></script>
   <script src="../libs/protobuf.js"></script>
   <script src="../libs/schema.js"></script>
 
@@ -19,7 +19,6 @@
   <script src="../libs/external/dexie/dexie.js"></script>
   <link rel="stylesheet" href="../libs/external/bootstrap/glyphicons.css">
 
-  <script src="../libs/sha1.js"></script>
   <script src="../libs/webspeech.js"></script>
   <script src="../libs/discord.js"></script>
 
@@ -27,12 +26,10 @@
   <script src="../libs/utils.js"></script>
   <script src="../libs/nicoapi.js"></script>
 
-  <script src="cc/ccdb.js"></script>
   <script src="db/initdb.js"></script>
   <script src="config.js"></script>
   <script src="datastruct.js"></script>
   <script src="windowmanage.js"></script>
-  <script src="keyboardshortcut.js"></script>
   <script src="usermanage.js"></script>
   <script src="comm.js"></script>
   <script src="mylist.js"></script>
@@ -61,18 +58,16 @@
       <div class="dropdown-menu">
         <a id="create-next-live" class="dropdown-item" href="#">次枠を作成</a>
         <div class="dropdown-divider"></div>
-        <a id="continuous-comment" class="dropdown-item" href="#">連続コメント</a>
-        <a id="enquete" class="dropdown-item" href="#">アンケート</a>
-        <div class="dropdown-divider"></div>
         <a id="mylist-manager" class="dropdown-item" href="#">マイリストマネージャー</a>
         <a id="open-video-db" class="dropdown-item" href="#">動画DB</a>
         <a id="save-comment" class="dropdown-item" href="#">コメントをファイルに保存</a>
         <div class="dropdown-divider"></div>
         <a id="menu-remote-connect" class="dropdown-item" href="#">🌐 リモートホストに接続...</a>
-        <a id="menu-login" class="dropdown-item" href="#">ニコニコログイン (内蔵ブラウザ)</a>
+        <a id="menu-login" class="dropdown-item" href="#">ニコニコログイン (ブラウザ起動)</a>
         <a id="menu-input-session" class="dropdown-item" href="#">🔑 セッションキー直接入力</a>
         <a id="open-settings" class="dropdown-item" href="#">設定</a>
         <a id="open-config-folder" class="dropdown-item" href="#">📁 設定フォルダを開く</a>
+        <a id="menu-reset-all-data" class="dropdown-item" href="#" style="color: #dc3545;">⚠️ アプリを完全初期化...</a>
         <div class="dropdown-divider"></div>
         <a id="open-about" class="dropdown-item" href="#">ℹ️ バージョン情報 (<span class="app-version-text">v99.99.99</span>)</a>
         <div class="dropdown-divider"></div>

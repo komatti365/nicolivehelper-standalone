@@ -143,11 +143,12 @@ var UserManage = {
         } );
 
         let updateVal = function( currentEle, value ){
-            $( currentEle ).html( '<input class="thVal" type="text" value="' + value + '" />' );
-            $( ".thVal" ).focus();
-            $( ".thVal" ).keydown( function( event ){
+            const $input = $( '<input class="thVal" type="text" />' ).val( value );
+            $( currentEle ).empty().append( $input );
+            $input.focus();
+            $input.keydown( function( event ){
                 if( event.keyCode == 13 ){
-                    let val = $( ".thVal" ).val().trim();
+                    let val = $input.val().trim();
                     $( currentEle ).text( val );
 
                     let user_id = $( currentEle ).attr( 'user_id' );

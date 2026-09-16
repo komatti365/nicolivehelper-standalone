@@ -1,27 +1,4 @@
-// -------------------------------------------------------------
-// XHR フック (withCredentials 自動有効化 & unsafe header エラー防止)
-// -------------------------------------------------------------
-try {
-  const originalOpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function (...args) {
-    const res = originalOpen.apply(this, args);
-    try { this.withCredentials = true; } catch (e) {}
-    return res;
-  };
-
-  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
-    if (header && (header.toLowerCase() === 'user-agent' || header.toLowerCase() === 'cookie')) {
-      // メインプロセス側で注入するため、レンダラーでの unsafe header エラーを回避
-      return;
-    }
-    return originalSetRequestHeader.apply(this, [header, value]);
-  };
-} catch (e) {
-  console.error('[Preload] Failed to patch XMLHttpRequest:', e);
-}
-
-const { ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 let appVersion = '99.99.99';
 try {
@@ -30,74 +7,51 @@ try {
   console.warn('[Preload] Failed to get app version synchronously:', e);
 }
 
-console.log('[Preload] Initializing browser API polyfill in renderer...');
+const storageChangeListeners = new Set();
+ipcRenderer.on('storage-changed', (event, changes) => {
+  for (const listener of storageChangeListeners) {
+    try {
+      listener(changes, 'local');
+    } catch (err) {
+      console.error('storage.onChanged error:', err);
+    }
+  }
+});
 
-// window.prompt ポリフィル
-window.prompt = function (message, defaultValue) {
-  console.log('[Prompt called]', message, defaultValue);
-  return defaultValue !== undefined ? String(defaultValue) : null;
+const storageLocal = {
+  get: async (keys) => {
+    return await ipcRenderer.invoke('storage-get', keys);
+  },
+  set: async (items) => {
+    return await ipcRenderer.invoke('storage-set', items);
+  },
+  remove: async (keys) => {
+    return await ipcRenderer.invoke('storage-remove', keys);
+  },
+  clear: async () => {
+    return await ipcRenderer.invoke('storage-clear');
+  }
 };
 
-const storageChangeListeners = new Set();
-const runtimeMessageListeners = new Set();
-
-// -------------------------------------------------------------
-// storage.local (メインプロセス storage.json バックエンド)
-  const storageLocal = {
-    get: async (keys) => {
-      return await ipcRenderer.invoke('storage-get', keys);
-    },
-    set: async (items) => {
-      return await ipcRenderer.invoke('storage-set', items);
-    },
-    remove: async (keys) => {
-      return await ipcRenderer.invoke('storage-remove', keys);
-    },
-    clear: async () => {
-      return await ipcRenderer.invoke('storage-clear');
-    }
-  };
-
-  // メインプロセスからの設定変更を受信してリスナーを実行
-  ipcRenderer.on('storage-changed', (event, changes) => {
-    for (const listener of storageChangeListeners) {
-      try {
-        listener(changes, 'local');
-      } catch (err) {
-        console.error('storage.onChanged error:', err);
-      }
-    }
-  });
-
-// -------------------------------------------------------------
-// window.browser ポリフィル本体
-// -------------------------------------------------------------
-window.browser = {
-  // management API
+const browserApi = {
   management: {
-    getSelf: async () => {
-      return {
-        id: 'stsen-app',
-        name: 'New NicoLive Helper',
-        version: appVersion,
-        installType: 'development',
-        type: 'extension'
-      };
-    }
+    getSelf: async () => ({
+      id: 'stsen-app',
+      name: 'New NicoLive Helper',
+      version: appVersion,
+      installType: 'development',
+      type: 'extension'
+    })
   },
-
-  // windows API
   windows: {
-    getCurrent: async () => {
-      return {
-        id: 1,
-        left: window.screenX,
-        top: window.screenY,
-        width: window.outerWidth,
-        height: window.outerHeight,
-        focused: true
-      };
-    },
+    getCurrent: async () => ({
+      id: 1,
+      left: window.screenX,
+      top: window.screenY,
+      width: window.outerWidth,
+      height: window.outerHeight,
+      focused: true
+    }),
     update: async (id, info) => {
       if (info && (info.width || info.height)) {
         window.resizeTo(info.width || window.outerWidth, info.height || window.outerHeight);
@@ -121,8 +75,6 @@ window.browser = {
     },
     get: async () => ({ tabs: [] })
   },
-
-  // tabs API
   tabs: {
     create: async (options) => {
       if (options.url) {
@@ -135,16 +87,10 @@ window.browser = {
       return { id: 1 };
     },
     query: async () => [],
-    remove: async () => {},
-    sendMessage: async (tabId, message) => {
-      ipcRenderer.send('to-extension', message);
-    }
+    remove: async () => {}
   },
-
-  // downloads API
   downloads: {
     download: async (options) => {
-      console.log('[Preload:downloads.download]', options);
       if (options.url) {
         const a = document.createElement('a');
         a.href = options.url;
@@ -156,56 +102,42 @@ window.browser = {
       return 1;
     }
   },
-
-  // notifications API
   notifications: {
     create: async (id, options) => {
-      console.log('[Preload:notifications.create]', options);
       return id || '1';
     }
   },
-
-  // storage API
   storage: {
     local: storageLocal,
     onChanged: {
-      addListener: (cb) => storageChangeListeners.add(cb),
-      removeListener: (cb) => storageChangeListeners.delete(cb),
+      addListener: (cb) => {
+        if (typeof cb === 'function') {
+          storageChangeListeners.add(cb);
+        }
+      },
+      removeListener: (cb) => {
+        if (typeof cb === 'function') {
+          storageChangeListeners.delete(cb);
+        }
+      },
       hasListener: (cb) => storageChangeListeners.has(cb)
     }
   },
-
-  // runtime API
   runtime: {
     getManifest: () => ({
       name: 'New NicoLive Helper',
       version: appVersion
     }),
     sendMessage: async (message) => {
-      console.log('[Preload:runtime.sendMessage]', message);
       if (!message || !message.cmd) return null;
-
       switch (message.cmd) {
-        case 'get-liveinfo': {
-          const res = await ipcRenderer.invoke('get-liveinfo', message.request_id);
-          console.log('[Preload:get-liveinfo response]', res ? `SUCCESS (${res.program && res.program.title})` : 'NOT FOUND');
-          return res;
-        }
-
+        case 'get-liveinfo':
+          return await ipcRenderer.invoke('get-liveinfo', message.request_id);
         case 'open-nicolivehelper':
           return await ipcRenderer.invoke('open-main-window', message.request_id);
-
         default:
-          ipcRenderer.send('to-extension', message);
           return null;
       }
-    },
-    onMessage: {
-      addListener: (cb) => {
-        runtimeMessageListeners.add(cb);
-      },
-      removeListener: (cb) => runtimeMessageListeners.delete(cb),
-      hasListener: (cb) => runtimeMessageListeners.has(cb)
     },
     openOptionsPage: () => {
       ipcRenderer.invoke('open-subwindow', {
@@ -215,35 +147,44 @@ window.browser = {
         title: 'New NicoLive Helper 設定'
       });
     },
-    getURL: (path) => path
+    getURL: (p) => p,
+    onMessage: {
+      addListener: (cb) => {},
+      removeListener: (cb) => {},
+      hasListener: (cb) => false
+    }
   },
-
   extension: {
-    getURL: (path) => path
+    getURL: (p) => p
   },
-
   browserAction: {
     setBadgeText: () => {}
   }
 };
 
-window.chrome = window.browser;
-
-// メインプロセスからのメッセージを受信
-ipcRenderer.on('from-extension', (event, data) => {
-  console.log('[Preload] Message from extension:', data);
-  for (const listener of runtimeMessageListeners) {
+const accountStatusCallbacks = new Set();
+ipcRenderer.on('account-status-changed', (event, data) => {
+  for (const cb of accountStatusCallbacks) {
     try {
-      listener(data, { id: 'extension' }, () => {});
-    } catch (err) {
-      console.error('runtime.onMessage listener error:', err);
+      cb(data);
+    } catch (e) {
+      console.error(e);
     }
   }
 });
 
-console.log('[Preload] Polyfill successfully injected. Initial URL:', window.location.href);
-// STSen 専用 API (内蔵ブラウザログイン / 枠手動接続 / アカウント管理 / リモート連携)
-window.stsen = {
+const remoteHostActionCallbacks = new Set();
+ipcRenderer.on('remote-host-execute-action', (event, data) => {
+  for (const cb of remoteHostActionCallbacks) {
+    try {
+      cb(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+});
+
+const stsenApi = {
   openLoginWindow: () => ipcRenderer.invoke('open-login-window'),
   logout: () => ipcRenderer.invoke('logout'),
   setUserSession: (val) => ipcRenderer.invoke('set-user-session', val),
@@ -251,27 +192,41 @@ window.stsen = {
   loadLive: (lvid) => ipcRenderer.invoke('load-live', lvid),
   detectCurrentLive: () => ipcRenderer.invoke('detect-current-live'),
   openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
+  resetAllData: () => ipcRenderer.invoke('reset-all-data'),
   getVersion: () => appVersion,
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),
   onAccountStatusChanged: (callback) => {
-    ipcRenderer.on('account-status-changed', (event, data) => callback(data));
+    if (typeof callback === 'function') {
+      accountStatusCallbacks.add(callback);
+    }
   },
-  // リモート連携 API
   getCookiesForSync: () => ipcRenderer.invoke('get-cookies-for-sync'),
   sendRemoteHostStateUpdate: (state) => ipcRenderer.send('remote-host-state-update', state),
   sendRemoteHostBroadcastEvent: (type, data) => ipcRenderer.send('remote-host-broadcast-event', { type, data }),
   onRemoteHostExecuteAction: (callback) => {
-    ipcRenderer.on('remote-host-execute-action', (event, data) => callback(data));
+    if (typeof callback === 'function') {
+      remoteHostActionCallbacks.add(callback);
+    }
   },
   sendRemoteActionResult: (actionId, data, error) => {
-    // ipcMain.handleOnce('remote-action-res:${actionId}') は invoke でレスポンスを送る
     return ipcRenderer.invoke(`remote-action-res:${actionId}`, { data, error });
   },
   getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
   updateRemoteServerConfig: (config) => ipcRenderer.invoke('remote-server-update-config', config)
 };
 
-ipcRenderer.on('account-status-changed', (event, data) => {
-  window.dispatchEvent(new CustomEvent('stsen-account-status-changed', { detail: data }));
-});
+// 安全にメインワールドへ公開 (contextIsolation: true 対応)
+try {
+  contextBridge.exposeInMainWorld('stsen', stsenApi);
+  console.log('[Preload] stsen exposed successfully');
+} catch (e) {
+  console.error('[Preload] Failed to expose stsen:', e);
+}
+
+try {
+  contextBridge.exposeInMainWorld('browser', browserApi);
+  console.log('[Preload] browser exposed successfully');
+} catch (e) {
+  console.error('[Preload] Failed to expose browser:', e);
+}

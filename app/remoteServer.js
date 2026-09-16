@@ -47,7 +47,7 @@ class RemoteServer {
       if (this.password) {
         console.log('[STSen:RemoteHost] Password authentication is ENABLED.');
       } else {
-        console.log('[STSen:RemoteHost] WARNING: Password authentication is DISABLED (Open access).');
+        console.warn('[STSen:RemoteHost] WARNING: No password configured. Remote server will reject unauthorized requests until a password is set.');
       }
     });
 
@@ -102,26 +102,39 @@ class RemoteServer {
     }
   }
 
-  // 認証チェックヘルパー
-  _isAuthorized(req, parsedUrl) {
-    if (!this.password) return true;
+  // 認証チェックヘルパー (パスワード必須 & Bearer トークンのみ許可)
+  _isAuthorized(req) {
+    if (!this.password) return false;
     const authHeader = req.headers['authorization'] || '';
     if (authHeader.startsWith('Bearer ')) {
-      if (authHeader.slice(7) === this.password) return true;
-    }
-    if (parsedUrl.searchParams && parsedUrl.searchParams.get('token') === this.password) {
-      return true;
+      return authHeader.slice(7) === this.password;
     }
     return false;
   }
 
-  _sendJson(res, statusCode, data) {
-    res.writeHead(statusCode, {
+  _getCorsHeaders(req) {
+    const origin = req.headers['origin'] || '';
+    let allowOrigin = '';
+    // 外部サイトからの CSRF / 攻撃を防止。ローカルまたはデスクトップオリジンのみ許可
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('file://')) {
+      allowOrigin = origin || '*';
+    }
+    const headers = {
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    });
+    };
+    if (allowOrigin) {
+      headers['Access-Control-Allow-Origin'] = allowOrigin;
+    }
+    return headers;
+  }
+
+  _sendJson(res, statusCode, data, req = null) {
+    const headers = req ? this._getCorsHeaders(req) : {
+      'Content-Type': 'application/json; charset=utf-8'
+    };
+    res.writeHead(statusCode, headers);
     res.end(JSON.stringify(data));
   }
 
@@ -131,11 +144,8 @@ class RemoteServer {
 
     // CORS preflight
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      });
+      const headers = this._getCorsHeaders(req);
+      res.writeHead(204, headers);
       res.end();
       return;
     }
@@ -147,30 +157,34 @@ class RemoteServer {
       return this._sendJson(res, 200, {
         app: 'STSen-RemoteHost',
         status: 'ok',
-        requiresAuth: !!this.password,
+        requiresAuth: true,
+        hasPassword: !!this.password,
         version: '1.0.0'
-      });
+      }, req);
     }
 
-    // 認証 API (トークン検証)
+    // 認証 API (パスワード検証)
     if (pathname === '/api/auth' && req.method === 'POST') {
+      if (!this.password) {
+        return this._sendJson(res, 403, { success: false, error: 'ホスト側でパスワードが設定されていません。パスワードを設定してください。' }, req);
+      }
       const body = await this._readBody(req);
-      if (!this.password || body.password === this.password) {
-        return this._sendJson(res, 200, { success: true, token: this.password });
+      if (body.password === this.password) {
+        return this._sendJson(res, 200, { success: true, token: this.password }, req);
       } else {
-        return this._sendJson(res, 401, { success: false, error: 'パスワードが一致しません' });
+        return this._sendJson(res, 401, { success: false, error: 'パスワードが一致しません' }, req);
       }
     }
 
     // 以降のエンドポイントは認証が必要
-    if (!this._isAuthorized(req, parsed)) {
-      return this._sendJson(res, 401, { success: false, error: 'Unauthorized: パスワードが必要です' });
+    if (!this._isAuthorized(req)) {
+      return this._sendJson(res, 401, { success: false, error: 'Unauthorized: 有効なパスワード認証が必要です' }, req);
     }
 
     // 状態取得
     if (pathname === '/api/status' && req.method === 'GET') {
       const state = this.getState ? this.getState() : {};
-      return this._sendJson(res, 200, { success: true, state });
+      return this._sendJson(res, 200, { success: true, state }, req);
     }
 
     // セッション同期 (手元PCからCookieを受信して適用)
@@ -179,11 +193,11 @@ class RemoteServer {
         const body = await this._readBody(req);
         if (Array.isArray(body.cookies) && this.onSyncCookies) {
           const result = await this.onSyncCookies(body.cookies);
-          return this._sendJson(res, 200, { success: true, result });
+          return this._sendJson(res, 200, { success: true, result }, req);
         }
-        return this._sendJson(res, 400, { success: false, error: 'Invalid cookies array' });
+        return this._sendJson(res, 400, { success: false, error: 'Invalid cookies array' }, req);
       } catch (e) {
-        return this._sendJson(res, 500, { success: false, error: e.message });
+        return this._sendJson(res, 500, { success: false, error: e.message }, req);
       }
     }
 
@@ -192,11 +206,11 @@ class RemoteServer {
       try {
         if (this.onLogout) {
           const result = await this.onLogout();
-          return this._sendJson(res, 200, { success: true, result });
+          return this._sendJson(res, 200, { success: true, result }, req);
         }
-        return this._sendJson(res, 200, { success: true });
+        return this._sendJson(res, 200, { success: true }, req);
       } catch (e) {
-        return this._sendJson(res, 500, { success: false, error: e.message });
+        return this._sendJson(res, 500, { success: false, error: e.message }, req);
       }
     }
 
@@ -205,41 +219,27 @@ class RemoteServer {
       try {
         const body = await this._readBody(req);
         if (!body.action) {
-          return this._sendJson(res, 400, { success: false, error: 'action is required' });
+          return this._sendJson(res, 400, { success: false, error: 'action is required' }, req);
         }
         if (this.onAction) {
           const result = await this.onAction(body.action, body.params || {});
-          return this._sendJson(res, 200, { success: true, result });
+          return this._sendJson(res, 200, { success: true, result }, req);
         }
-        return this._sendJson(res, 200, { success: true });
+        return this._sendJson(res, 200, { success: true }, req);
       } catch (e) {
-        return this._sendJson(res, 500, { success: false, error: e.message });
+        return this._sendJson(res, 500, { success: false, error: e.message }, req);
       }
     }
 
-    this._sendJson(res, 404, { success: false, error: 'Not Found' });
+    this._sendJson(res, 404, { success: false, error: 'Not Found' }, req);
   }
 
-  // WebSocket 接続処理
+  // WebSocket 接続処理 (常に認証メッセージを必須化)
   _handleWsConnection(ws, req) {
-    const parsed = new URL(req.url, 'http://127.0.0.1');
-    let authenticated = !this.password;
+    let authenticated = false;
 
-    // クエリパラメータでの認証チェック
-    if (this.password && parsed.searchParams && parsed.searchParams.get('token') === this.password) {
-      authenticated = true;
-    }
-
-    if (authenticated) {
-      this.clients.add(ws);
-      console.log(`[STSen:RemoteHost] Client authenticated via WebSocket. Total: ${this.clients.size}`);
-      // 初期状態をプッシュ
-      const state = this.getState ? this.getState() : {};
-      ws.send(JSON.stringify({ type: 'init-state', data: state }));
-    } else {
-      console.log('[STSen:RemoteHost] WebSocket client connected. Awaiting auth message...');
-      ws.send(JSON.stringify({ type: 'auth-required' }));
-    }
+    console.log('[STSen:RemoteHost] WebSocket client connected. Awaiting auth message...');
+    ws.send(JSON.stringify({ type: 'auth-required' }));
 
     ws.on('message', async (raw) => {
       try {
@@ -247,7 +247,7 @@ class RemoteServer {
 
         // 認証メッセージ
         if (msg.type === 'auth') {
-          if (!this.password || msg.password === this.password) {
+          if (this.password && msg.password === this.password) {
             authenticated = true;
             this.clients.add(ws);
             console.log(`[STSen:RemoteHost] Client successfully authenticated via message. Total: ${this.clients.size}`);
@@ -255,8 +255,8 @@ class RemoteServer {
             const state = this.getState ? this.getState() : {};
             ws.send(JSON.stringify({ type: 'init-state', data: state }));
           } else {
-            console.warn('[STSen:RemoteHost] Client auth failed (wrong password).');
-            ws.send(JSON.stringify({ type: 'auth-failure', error: 'パスワードが一致しません' }));
+            console.warn('[STSen:RemoteHost] Client auth failed (wrong or unset password).');
+            ws.send(JSON.stringify({ type: 'auth-failure', error: 'パスワードが一致しません（ホスト側にパスワードを設定してください）' }));
           }
           return;
         }
