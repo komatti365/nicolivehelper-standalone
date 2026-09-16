@@ -61,55 +61,69 @@ var NicoLiveMylist = {
     },
 
     /**
-     * 指定のマイリスト内の動画IDリストを取得.
+     * 指定のマイリスト内の動画IDリストを取得 (nvapi経由).
      * マイリストコメントも拾って保存する。
      * @param mylist_id
-     * @returns {Promise<any>}
+     * @returns {Promise<Array>}
+     */
+    retrieveVideoIdFromMylist: async function( mylist_id ){
+        let parseMylistItems = ( items ) => {
+            let videos = [];
+            for( let item of items ){
+                let video_id = (item.video && item.video.id) || item.watchId;
+                if( video_id ){
+                    videos.push( video_id );
+                    let pubDate = item.addedAt ? (new Date( item.addedAt )).getTime() / 1000 : 0;
+                    let dat = {
+                        "pubDate": pubDate,
+                        "description": item.description || ""
+                    };
+                    this.mylist_itemdata["_" + video_id] = dat;
+                    this.mylist_itemdata[video_id] = dat;
+                }
+            }
+            return videos;
+        };
+
+        let fetchWithApi = ( apiFunc ) => {
+            return new Promise( ( resolve ) => {
+                apiFunc( mylist_id, ( xml, req ) => {
+                    if( req && req.readyState == 4 && req.status == 200 ){
+                        try{
+                            let res = JSON.parse( req.responseText );
+                            if( res && res.data && res.data.mylist && Array.isArray( res.data.mylist.items ) ){
+                                resolve( parseMylistItems( res.data.mylist.items ) );
+                                return;
+                            }
+                        }catch( e ){
+                            console.error( 'Failed to parse mylist response:', e );
+                        }
+                    }
+                    resolve( null );
+                } );
+            } );
+        };
+
+        // 1. まずログイン中の自身のマイリスト(非公開含む)を試行
+        let videos = await fetchWithApi( NicoApi.getMylist.bind( NicoApi ) );
+        if( videos !== null ){
+            return videos;
+        }
+
+        // 2. 失敗した場合(他人の公開マイリストなど)、公開マイリストAPI (v2) を試行
+        videos = await fetchWithApi( NicoApi.getPublicMylist.bind( NicoApi ) );
+        if( videos !== null ){
+            return videos;
+        }
+
+        return [];
+    },
+
+    /**
+     * 後方互換性のためのエイリアス
      */
     retrieveVideoIdFromRSS: async function( mylist_id ){
-        let p = new Promise( ( resolve, reject ) =>{
-            let f = ( xml, req ) =>{
-                if( req.readyState == 4 ){
-                    if( req.status == 200 ){
-                        let xml = req.responseXML;
-                        let items = xml.getElementsByTagName( 'item' );
-                        let videos = [];
-                        console.log( 'mylist rss items:' + items.length );
-                        for( let i = 0, item; item = items[i]; i++ ){
-                            let video_id;
-                            let description;
-                            try{
-                                video_id = item.getElementsByTagName( 'link' )[0].textContent.match( /(sm|nm)\d+|\d{10}/ );
-                            }catch( x ){
-                                video_id = "";
-                            }
-                            if( video_id ){
-                                videos.push( video_id[0] );
-                                try{
-                                    description = item.getElementsByTagName( 'description' )[0].textContent;
-                                    description = description.replace( /[\r\n]/mg, '<br>' );
-                                    description = description.match( /<p class="nico-memo">(.*?)<\/p>/ )[1];
-                                }catch( x ){
-                                    description = "";
-                                }
-
-                                let d = new Date( item.getElementsByTagName( 'pubDate' )[0].textContent );
-                                let dat = {
-                                    "pubDate": d.getTime() / 1000,  // 登録日 UNIX time
-                                    "description": description
-                                };
-                                this.mylist_itemdata[video_id[0]] = dat;
-                            }
-                        }// end for.
-                        resolve( videos );
-                    }else{
-                        resolve( [] );
-                    }
-                }
-            };
-            NicoApi.mylistRSS( mylist_id, f );
-        } );
-        return p;
+        return this.retrieveVideoIdFromMylist( mylist_id );
     },
 
     getName: function( mylist_id ){

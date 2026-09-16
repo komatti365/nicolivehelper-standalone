@@ -74,10 +74,22 @@ var NicoApi = {
         this.callApi( url, postfunc );
     },
 
+    /**
+     * マイリストRSS (※ニコニコ公式で廃止済み。互換性のために残存)
+     */
     mylistRSS: function( mylist_id, postfunc ){
-        let url = `https://www.nicovideo.jp/mylist/${mylist_id}?rss=2.0&lang=ja-jp&special_chars_decode=1
-`;
+        let url = `https://www.nicovideo.jp/mylist/${mylist_id}?rss=2.0&lang=ja-jp&special_chars_decode=1`;
         this.callApi( url, postfunc );
+    },
+
+    /**
+     * 公開マイリストの内容を取得する (他人の公開マイリストも取得可能)
+     * @param mylist_id
+     * @param postfunc
+     */
+    getPublicMylist: function( mylist_id, postfunc ){
+        let url = `https://nvapi.nicovideo.jp/v2/mylists/${mylist_id}?pageSize=500&page=1`;
+        this.callApi( url, postfunc, null, this.nicoapi_header );
     },
 
     /**
@@ -86,7 +98,7 @@ var NicoApi = {
      * @param postfunc
      */
     getMylist: function( mylist_id, postfunc ){
-        let url = `https://nvapi.nicovideo.jp/v1/users/me/mylists/${mylist_id}?pageSize=500&page=1`
+        let url = `https://nvapi.nicovideo.jp/v1/users/me/mylists/${mylist_id}?pageSize=500&page=1`;
         this.callApi( url, postfunc, null, this.nicoapi_header );
     },
 
