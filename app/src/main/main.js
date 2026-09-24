@@ -635,11 +635,68 @@ var NicoLiveHelper = {
 
 
     /**
-     * スタートアップコメントを送信する.
+     * スタートアップコメント（配信開始時の挨拶）を送信する.
      * @returns {Promise<void>}
      */
     sendStartupComment: async function(){
-        // Continuous comments feature was removed
+        if( !Config['startup-comment-enabled'] ) return;
+        if( !this.isCaster() ) return;
+        if( this._startup_comment_sent ) return;
+
+        // 放送開始からの経過秒数チェック（枠の途中から接続・再接続した際の誤爆防止）
+        let liveprogress = GetCurrentTime() - this.live_begintime;
+        let expireSec = parseInt( Config['startup-comment-expire-seconds'] ) || 180;
+        if( this.live_begintime && liveprogress > expireSec ){
+            console.log( `[StartupComment] 放送開始から ${liveprogress}秒 経過しているため、挨拶送信をスキップします (上限: ${expireSec}秒)` );
+            return;
+        }
+
+        let rawText = Config['startup-comment-text'];
+        if( !rawText || !rawText.trim() ) return;
+
+        // 多重送信防止フラグを直ちに立てる
+        this._startup_comment_sent = true;
+
+        console.log( '[StartupComment] スタートアップコメント送信シーケンスを開始します' );
+
+        // 接続直後の待機ディレイ
+        let delaySec = parseInt( Config['startup-comment-delay'] );
+        if( isNaN( delaySec ) || delaySec < 0 ) delaySec = 3;
+        if( delaySec > 0 ){
+            console.log( `[StartupComment] 待機中 (${delaySec}秒)...` );
+            await Wait( delaySec * 1000 );
+        }
+
+        let lines = rawText.split( /\r\n|\r|\n/ );
+        let target = Config['startup-comment-target'] || 'caster';
+        let command = Config['startup-comment-command'] || '';
+        let intervalSec = parseInt( Config['startup-comment-interval'] );
+        if( isNaN( intervalSec ) || intervalSec < 1 ) intervalSec = 5;
+
+        for( let i = 0; i < lines.length; i++ ){
+            let line = lines[i].trim();
+            if( !line ) continue;
+
+            // マクロ展開
+            let text = this.replaceMacros( line, this.currentVideo || {} );
+
+            try {
+                if( target === 'listener' ){
+                    console.log( `[StartupComment] 通常コメント送信 (${i + 1}/${lines.length}): ${text}` );
+                    this.sendComment( command, text );
+                } else {
+                    console.log( `[StartupComment] 主コメ送信 (${i + 1}/${lines.length}): ${text}` );
+                    this.postCasterComment( text, command, '', false );
+                }
+            } catch( err ) {
+                console.error( '[StartupComment] コメント送信エラー:', err );
+            }
+
+            if( i < lines.length - 1 && intervalSec > 0 ){
+                await Wait( intervalSec * 1000 );
+            }
+        }
+        this.showAlert( '配信開始の挨拶コメントを送信しました' );
     },
 
     /**
@@ -1382,7 +1439,7 @@ var NicoLiveHelper = {
 
             (async () => {
                 await this.initProgressBar();
-                if( !this.currentVideo ){
+                if( !this.currentVideo && !this._startup_comment_sent ){
                     this.sendStartupComment();
                 }
             })();
@@ -2811,6 +2868,7 @@ var NicoLiveHelper = {
 
         if( lvid ){
             // 放送IDが渡されたら放送に接続する
+            this._startup_comment_sent = false;
             if( this.liveProp ){
                 console.log( 'init: connecting to live' );
                 this.connectServer();

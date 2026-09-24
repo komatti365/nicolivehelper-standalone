@@ -27,3 +27,179 @@ body {
 .label {
     width: 16em;
 }
+
+/* === マクロ（プレースホルダー）入力支援 UI === */
+.macro-helper-panel {
+    background: #f8f9fb;
+    border: 1px solid #dce4ec;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+.macro-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 6px;
+}
+
+.macro-toolbar-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #495057;
+    margin-right: 2px;
+}
+
+.macro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-family: inherit;
+    border-radius: 12px;
+    border: 1px solid #b8daff;
+    background: #e7f1ff;
+    color: #004085;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.macro-chip:hover {
+    background: #cce5ff;
+    border-color: #7abaff;
+    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.macro-chip:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.macro-chip.chip-green {
+    border-color: #c3e6cb;
+    background: #e2f0d9;
+    color: #155724;
+}
+.macro-chip.chip-green:hover {
+    background: #d4edda;
+    border-color: #8ce196;
+}
+
+.macro-chip.chip-purple {
+    border-color: #d6d8f5;
+    background: #edeefb;
+    color: #383d8a;
+}
+.macro-chip.chip-purple:hover {
+    background: #dfdff8;
+    border-color: #b1b4ee;
+}
+
+.macro-preview-wrapper {
+    background: #ffffff;
+    border: 1px dashed #b0c4de;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #333;
+}
+
+.macro-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10.5px;
+    color: #6c757d;
+    margin-bottom: 3px;
+}
+
+.macro-preview-target-name {
+    font-weight: bold;
+    color: #0056b3;
+}
+
+.macro-preview-content {
+    font-family: Consolas, monospace, sans-serif;
+    color: #1b1e21;
+    word-break: break-all;
+    white-space: pre-wrap;
+    background: #fdfdfd;
+    min-height: 1.3em;
+}
+
+.macro-char-count {
+    font-size: 10.5px;
+    color: #6c757d;
+}
+
+.macro-char-count.warning {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.macro-reference-details {
+    margin-top: 6px;
+    font-size: 11.5px;
+}
+
+.macro-reference-details summary {
+    cursor: pointer;
+    color: #0066cc;
+    user-select: none;
+    outline: none;
+    font-weight: 500;
+}
+
+.macro-reference-details summary:hover {
+    text-decoration: underline;
+}
+
+.macro-reference-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 11px;
+    background: #ffffff;
+}
+
+.macro-reference-table th,
+.macro-reference-table td {
+    border: 1px solid #dee2e6;
+    padding: 3px 6px;
+    text-align: left;
+}
+
+.macro-reference-table th {
+    background: #f1f3f5;
+    color: #495057;
+    font-weight: 600;
+}
+
+.macro-reference-table tr:hover {
+    background: #f8f9fa;
+}
+
+.macro-table-tag {
+    cursor: pointer;
+    font-family: Consolas, monospace;
+    font-weight: bold;
+    color: #0056b3;
+    background: #eef5fc;
+    padding: 1px 4px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.macro-table-tag:hover {
+    background: #0056b3;
+    color: #fff;
+}
+

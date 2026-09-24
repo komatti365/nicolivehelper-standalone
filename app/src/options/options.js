@@ -155,6 +155,15 @@ async function LoadOptions(){
     LoadBool( 'auto-create-next', config, Config['auto-create-next'] );
     LoadBool( 'auto-close-livepage', config, Config['auto-close-livepage'] );
 
+    /* スタートアップコメント（配信開始時の挨拶） */
+    LoadBool( 'startup-comment-enabled', config, Config['startup-comment-enabled'] );
+    LoadValue( 'startup-comment-target', config, Config['startup-comment-target'] );
+    LoadValue( 'startup-comment-command', config, Config['startup-comment-command'] );
+    LoadValue( 'startup-comment-delay', config, Config['startup-comment-delay'] );
+    LoadValue( 'startup-comment-interval', config, Config['startup-comment-interval'] );
+    LoadValue( 'startup-comment-expire-seconds', config, Config['startup-comment-expire-seconds'] );
+    LoadValue( 'startup-comment-text', config, Config['startup-comment-text'] );
+
     /* リクエスト */
     LoadValue( 'max-request', config, Config['max-request'] );
     LoadBool( 'request-no-duplicated', config, Config['request-no-duplicated'] );
@@ -248,6 +257,8 @@ async function LoadOptions(){
     LoadValue( 'tag-search-auto-trigger', config, Config['tag-search-auto-trigger'] );
     LoadValue( 'tag-search-stock-threshold', config, Config['tag-search-stock-threshold'] );
     LoadValue( 'tag-search-auto-interval', config, Config['tag-search-auto-interval'] );
+
+    refreshAllMacroPreviews();
 }
 
 function SaveOptions( ev ){
@@ -273,6 +284,15 @@ function SaveOptions( ev ){
     SaveBool( 'auto-close', config );
     SaveBool( 'auto-create-next', config );
     SaveBool( 'auto-close-livepage', config );
+
+    /* スタートアップコメント（配信開始時の挨拶） */
+    SaveBool( 'startup-comment-enabled', config );
+    SaveValue( 'startup-comment-target', config );
+    SaveValue( 'startup-comment-command', config );
+    SaveInt( 'startup-comment-delay', config );
+    SaveInt( 'startup-comment-interval', config );
+    SaveInt( 'startup-comment-expire-seconds', config );
+    SaveValue( 'startup-comment-text', config );
 
     /* リクエスト */
     SaveInt( 'max-request', config );
@@ -400,4 +420,243 @@ window.addEventListener( 'load', async function( ev ){
         const v = window.stsen.getVersion();
         $( '.app-version-text' ).text( v.startsWith('v') ? v : 'v' + v );
     }
+
+    initMacroHelpers();
 } );
+
+/* ==========================================================================
+   マクロ（プレースホルダー）入力支援ロジック
+   ========================================================================== */
+
+const SAMPLE_MACRO_DATA = {
+    video: {
+        video_id: 'sm1715919',
+        title: 'メルト',
+        first_retrieve: 1197019440, // 2007/12/07 18:24
+        length: '04:15',
+        view_counter: 14235100,
+        comment_num: 3580210,
+        mylist_counter: 450120,
+        tags: { jp: ['VOCALOID', '初音ミク', 'メルト', 'ryo', 'ミクオリジナル曲', '伝説のVOCALOIDマスター'] },
+        user_nickname: 'ryo',
+        description: 'ryoです。今回は初音ミクにオリジナルの曲を歌ってもらいました。本家様→sm1715919',
+        comment_no: 128,
+        mylistcomment: '言わずと知れた名曲！'
+    },
+    live: {
+        id: 'lv345678901',
+        title: '【テスト配信】ボカロ名曲枠',
+        endTime: '2026/09/16 18:00'
+    },
+    counts: {
+        requestnum: 3,
+        requesttime: '00:12:30',
+        stocknum: 8,
+        stocktime: '00:35:10',
+        reqAllowed: true
+    }
+};
+
+/**
+ * マクロ文字列をサンプルデータで展開
+ */
+function previewMacroString( str ){
+    if( !str ) return '';
+    const v = SAMPLE_MACRO_DATA.video;
+    const l = SAMPLE_MACRO_DATA.live;
+    const c = SAMPLE_MACRO_DATA.counts;
+
+    const replacefunc = function( s, p ){
+        let tmp = s;
+        if( p.match( /^reqstat:(.*?):(.*?)$/ ) ){
+            let msgs = [RegExp.$1, RegExp.$2];
+            return c.reqAllowed ? msgs[0] : msgs[1];
+        }
+        switch( p ){
+            case 'id': return v.video_id;
+            case 'title': return v.title;
+            case 'date': return typeof GetDateString === 'function' ? GetDateString( v.first_retrieve * 1000, true ) : '2007/12/07 18:24';
+            case 'length': return v.length;
+            case 'view': return typeof FormatCommas === 'function' ? FormatCommas( v.view_counter ) : '14,235,100';
+            case 'comment': return typeof FormatCommas === 'function' ? FormatCommas( v.comment_num ) : '3,580,210';
+            case 'mylist': return typeof FormatCommas === 'function' ? FormatCommas( v.mylist_counter ) : '450,120';
+            case 'mylistrate': return (100 * v.mylist_counter / v.view_counter).toFixed( 1 ) + '%';
+            case 'tags': return v.tags.jp.join( '　' ).replace( /(.{35,}?)　/g, "$1\n" );
+            case 'username': return v.user_nickname;
+            case 'pname': return 'ryo(supercell)';
+            case 'description': return v.description.slice( 0, 40 );
+            case 'comment_no': return v.comment_no;
+            case 'requestnum': return c.requestnum;
+            case 'requesttime': return c.requesttime;
+            case 'stocknum': return c.stocknum;
+            case 'stocktime': return c.stocktime;
+            case 'mylistcomment': return v.mylistcomment;
+            case 'pref:min-ago': return 5;
+            case 'end-time': return l.endTime;
+            case 'live-id': return l.id;
+            case 'live-title': return l.title;
+            default: return s;
+        }
+    };
+
+    let r = "";
+    let token = "";
+    let nest = 0;
+    for( let i = 0, ch; ch = str.charAt( i ); i++ ){
+        switch( nest ){
+        case 0:
+            if( ch == '{' ){
+                nest++;
+                token += ch;
+                break;
+            }
+            r += ch;
+            break;
+        default:
+            token += ch;
+            if( ch == '{' ) nest++;
+            if( ch == '}' ){
+                nest--;
+                if( nest <= 0 ){
+                    try{
+                        r += replacefunc( token, token.substring( 1, token.length - 1 ) );
+                    }catch( x ){
+                    }
+                    token = "";
+                }
+            }
+            break;
+        }
+    }
+    return r;
+}
+
+/**
+ * 文字数と全角・半角換算文字数を計算
+ */
+function getCharCounts( str ){
+    if( !str ) return { chars: 0, halfWidthEquivalent: 0 };
+    let len = str.length;
+    let byteLen = 0;
+    for (let i = 0; i < len; i++) {
+        const code = str.charCodeAt(i);
+        if ((code >= 0x0 && code < 0x81) || (code === 0xf8f0) || (code >= 0xff61 && code < 0xffa0) || (code >= 0xf8f1 && code < 0xf8f4)) {
+            byteLen += 1;
+        } else {
+            byteLen += 2;
+        }
+    }
+    return {
+        chars: len,
+        halfWidthEquivalent: byteLen
+    };
+}
+
+const lastFocusedMacroInputs = {
+    startup: null,
+    vinfo: null,
+    request: null,
+    discord: null
+};
+
+/**
+ * プレビュー枠を更新
+ */
+function updateMacroPreview( group, inputElem ){
+    if( !inputElem ) return;
+    const $elem = $( inputElem );
+    const groupName = group || $elem.data( 'macro-group' );
+    if( !groupName ) return;
+
+    lastFocusedMacroInputs[groupName] = inputElem;
+
+    const labelName = $elem.data( 'macro-name' ) || inputElem.placeholder || inputElem.id;
+    $( `#${groupName}-preview-target` ).text( labelName );
+
+    const val = $elem.val() || '';
+    const previewed = previewMacroString( val );
+    $( `#${groupName}-preview-content` ).text( previewed || '(未入力)' );
+
+    const counts = getCharCounts( previewed );
+    const countText = `${counts.chars}文字 (半角${counts.halfWidthEquivalent}字 / 全角約${Math.ceil(counts.halfWidthEquivalent / 2)}字)`;
+    const $charCount = $( `#${groupName}-char-count` );
+    $charCount.text( countText );
+
+    const isCasterStartup = groupName === 'startup' && $( '#startup-comment-target' ).val() === 'caster';
+    if( (groupName === 'vinfo' || isCasterStartup) && counts.halfWidthEquivalent > 80 ){
+        $charCount.addClass( 'warning' ).attr( 'title', '⚠️ 主コメ推奨(半角80/全角40文字)を超過しています' );
+    } else {
+        $charCount.removeClass( 'warning' ).removeAttr( 'title' );
+    }
+}
+
+/**
+ * 全グループのプレビューを更新
+ */
+function refreshAllMacroPreviews(){
+    const defaultTargets = [
+        { group: 'startup', id: '#startup-comment-text' },
+        { group: 'vinfo', id: '#vinfo-comment-1' },
+        { group: 'request', id: '#request-accept' },
+        { group: 'discord', id: '#discord-text' }
+    ];
+    for( const item of defaultTargets ){
+        const elem = lastFocusedMacroInputs[item.group] || $( item.id ).get( 0 );
+        if( elem ){
+            updateMacroPreview( item.group, elem );
+        }
+    }
+}
+
+/**
+ * マクロタグを現在の対象入力欄のカーソル位置に挿入
+ */
+function insertMacroTag( group, tag ){
+    let target = lastFocusedMacroInputs[group];
+    if( !target ){
+        target = $( `.macro-input[data-macro-group="${group}"]` ).get( 0 );
+    }
+    if( !target ) return;
+
+    const startPos = target.selectionStart != null ? target.selectionStart : target.value.length;
+    const endPos = target.selectionEnd != null ? target.selectionEnd : target.value.length;
+    const oldVal = target.value;
+    target.value = oldVal.substring( 0, startPos ) + tag + oldVal.substring( endPos );
+    
+    target.selectionStart = target.selectionEnd = startPos + tag.length;
+    target.focus();
+
+    updateMacroPreview( group, target );
+}
+
+/**
+ * マクロ入力支援UIの初期化
+ */
+function initMacroHelpers(){
+    // タグチップおよびテーブル内タグのクリック
+    $( document ).on( 'click', '.macro-chip, .macro-table-tag', function( ev ){
+        ev.preventDefault();
+        const tag = $( this ).data( 'tag' );
+        const $panel = $( this ).closest( '.macro-helper-panel' );
+        const group = $panel.data( 'group' );
+        if( group && tag ){
+            insertMacroTag( group, tag );
+        }
+    } );
+
+    // マクロ入力欄のフォーカスおよび入力イベント
+    $( document ).on( 'focus input', '.macro-input', function( ev ){
+        const group = $( this ).data( 'macro-group' );
+        updateMacroPreview( group, this );
+    } );
+
+    $( document ).on( 'change', '#startup-comment-target', function(){
+        updateMacroPreview( 'startup', $( '#startup-comment-text' ).get( 0 ) );
+    } );
+
+    // 初期プレビュー表示
+    setTimeout( () => {
+        refreshAllMacroPreviews();
+    }, 150 );
+}
+

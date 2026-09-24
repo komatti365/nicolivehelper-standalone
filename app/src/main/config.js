@@ -34,6 +34,15 @@ var Config = {
     'auto-create-next': false,
     'auto-close-livepage': false,
 
+    /* スタートアップコメント（配信開始時の挨拶） */
+    'startup-comment-enabled': false,
+    'startup-comment-text': '配信を開始しました！本日の枠：{live-title}\nゆっくりしていってね！',
+    'startup-comment-target': 'caster',
+    'startup-comment-command': '',
+    'startup-comment-interval': 5,
+    'startup-comment-delay': 3,
+    'startup-comment-expire-seconds': 180,
+
     'videoinfo-interval': 7,
     'vinfo-command-1': '',
     'vinfo-comment-1': '♪時間:{length} 再生数:{view} コメント:{comment} マイリスト:{mylist}',
