@@ -111,26 +111,151 @@
   </fieldset>
 
   <fieldset>
+    <legend>スタートアップコメント（配信開始時の挨拶）</legend>
+    <div style="margin-bottom: 8px;">
+      <label><input type="checkbox" id="startup-comment-enabled"> 配信開始時に自動で挨拶コメントを送信する</label>
+    </div>
+
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px;">
+      <div>
+        <label for="startup-comment-target">送信先:</label>
+        <select id="startup-comment-target">
+          <option value="caster">主コメ (運営コメント)</option>
+          <option value="listener">通常コメント (放送主チャット)</option>
+        </select>
+      </div>
+      <div>
+        <label for="startup-comment-command">コマンド:</label>
+        <input id="startup-comment-command" type="text" style="width: 10em;" placeholder="例: shita white">
+        <small style="color: #666; font-size: 11px;">(空欄可)</small>
+      </div>
+      <div>
+        <label for="startup-comment-delay">送信開始待機:</label>
+        <input id="startup-comment-delay" type="number" min="0" max="60" value="3" style="width: 4em;"> 秒
+      </div>
+      <div>
+        <label for="startup-comment-interval">行間インターバル:</label>
+        <input id="startup-comment-interval" type="number" min="1" max="60" value="5" style="width: 4em;"> 秒
+      </div>
+      <div>
+        <label for="startup-comment-expire-seconds" title="枠開始からこの秒数を過ぎて途中接続した場合は送信しません">送信有効期限:</label>
+        <input id="startup-comment-expire-seconds" type="number" min="30" max="1800" value="180" style="width: 5em;"> 秒
+        <small style="color: #666; font-size: 11px;">(途中接続時の誤爆防止)</small>
+      </div>
+    </div>
+
+    <!-- マクロ入力支援パネル (スタートアップコメント) -->
+    <div class="macro-helper-panel" data-group="startup">
+      <div class="macro-toolbar">
+        <span class="macro-toolbar-label">💡 タグをクリックして挿入:</span>
+        <button type="button" class="macro-chip chip-purple" data-tag="{live-title}" title="配信タイトル">+ 配信タイトル</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{live-id}" title="配信ID (例: lv345678901)">+ 配信ID</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{reqstat:受付中:受付停止中}" title="リクエスト受付状態に応じて切り替え">+ 受付切替</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{stocknum}" title="未再生ストック残数">+ ストック数</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{stocktime}" title="ストック合計残時間 (hh:mm:ss)">+ ストック時間</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{end-time}" title="配信終了予定時刻">+ 終了時刻</button>
+      </div>
+
+      <div class="macro-preview-wrapper">
+        <div class="macro-preview-header">
+          <span>👁 プレビュー (<span class="macro-preview-target-name" id="startup-preview-target">スタートアップコメント</span>)</span>
+          <span class="macro-char-count" id="startup-char-count">0文字</span>
+        </div>
+        <div class="macro-preview-content" id="startup-preview-content"></div>
+      </div>
+    </div>
+
+    <div style="margin-top: 6px;">
+      <textarea id="startup-comment-text" class="macro-input" data-macro-group="startup" data-macro-name="スタートアップコメント" placeholder="配信開始時に送信するメッセージ（改行で複数行送信可能）" style="width: 100%; height: 4.5em; resize: vertical;"></textarea>
+    </div>
+    <div style="font-size: 11.5px; color: #666; margin-top: 4px;">
+      ※複数行入力すると、設定したインターバル秒数ごとに上から順に送信されます。<br>
+      ※主コメ（運営コメント）は1行につき全角約40文字（半角80文字相当）まで推奨です。超過にご注意ください。
+    </div>
+  </fieldset>
+
+  <fieldset>
+
     <legend>動画情報</legend>
     <div style="margin-bottom:0.5em;">
       <label for="videoinfo-interval" class="mr-2">送信間隔</label>
       <input id="videoinfo-interval" type="number" min="1" max="60" value="7" style="width:6em;">秒
     </div>
+
+    <!-- マクロ入力支援パネル (動画情報) -->
+    <div class="macro-helper-panel" data-group="vinfo">
+      <div class="macro-toolbar">
+        <span class="macro-toolbar-label">💡 タグをクリックして挿入:</span>
+        <button type="button" class="macro-chip" data-tag="{title}" title="動画タイトル (例: メルト)">+ タイトル</button>
+        <button type="button" class="macro-chip" data-tag="{id}" title="動画ID (例: sm1715919)">+ 動画ID</button>
+        <button type="button" class="macro-chip" data-tag="{date}" title="投稿日時 (例: 2007/12/07 18:24)">+ 投稿日</button>
+        <button type="button" class="macro-chip" data-tag="{length}" title="動画の再生時間 (例: 04:15)">+ 時間</button>
+        <button type="button" class="macro-chip" data-tag="{view}" title="再生数 (例: 14,235,100)">+ 再生数</button>
+        <button type="button" class="macro-chip" data-tag="{comment}" title="コメント数 (例: 3,580,210)">+ コメ数</button>
+        <button type="button" class="macro-chip" data-tag="{mylist}" title="マイリスト数 (例: 450,120)">+ マイリス</button>
+        <button type="button" class="macro-chip" data-tag="{mylistrate}" title="マイリスト率 (例: 3.2%)">+ マイリス率</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{username}" title="投稿者名 (ユーザーニックネーム)">+ 投稿者名</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{pname}" title="タグやDB情報から判定されたP名">+ P名</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{stocknum}" title="未再生ストック残数">+ ストック数</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{stocktime}" title="ストック合計残時間 (hh:mm:ss)">+ ストック時間</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{live-title}" title="配信番組タイトル">+ 配信タイトル</button>
+      </div>
+
+      <div class="macro-preview-wrapper">
+        <div class="macro-preview-header">
+          <span>👁 プレビュー (<span class="macro-preview-target-name" id="vinfo-preview-target">動画情報１行目</span>)</span>
+          <span class="macro-char-count" id="vinfo-char-count">0文字</span>
+        </div>
+        <div class="macro-preview-content" id="vinfo-preview-content"></div>
+      </div>
+
+      <details class="macro-reference-details">
+        <summary>📖 使えるタグ一覧と説明（クリックで展開）</summary>
+        <table class="macro-reference-table">
+          <thead>
+            <tr><th>タグ（クリックで挿入）</th><th>説明</th><th>サンプル値</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="macro-table-tag" data-tag="{title}">{title}</span></td><td>動画タイトル</td><td>メルト</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{id}">{id}</span></td><td>動画ID</td><td>sm1715919</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{date}">{date}</span></td><td>投稿日時</td><td>2007/12/07 18:24</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{length}">{length}</span></td><td>再生時間</td><td>04:15</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{view}">{view}</span></td><td>再生回数 (カンマ区切り)</td><td>14,235,100</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{comment}">{comment}</span></td><td>コメント数 (カンマ区切り)</td><td>3,580,210</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{mylist}">{mylist}</span></td><td>マイリスト数 (カンマ区切り)</td><td>450,120</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{mylistrate}">{mylistrate}</span></td><td>マイリスト率 (%)</td><td>3.2%</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{username}">{username}</span></td><td>投稿者のニックネーム</td><td>ryo</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{pname}">{pname}</span></td><td>判定されたP名</td><td>ryo(supercell)</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{tags}">{tags}</span></td><td>登録タグ一覧 (約35文字で改行)</td><td>VOCALOID 初音ミク...</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{description}">{description}</span></td><td>動画説明文 (先頭40文字)</td><td>ryoです。今回は初音ミクに...</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{mylistcomment}">{mylistcomment}</span></td><td>マイリストコメント</td><td>名曲！</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{stocknum}">{stocknum}</span></td><td>未再生ストック残数</td><td>8</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{stocktime}">{stocktime}</span></td><td>ストック合計時間 (hh:mm:ss)</td><td>00:35:10</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requestnum}">{requestnum}</span></td><td>未再生リクエスト残数</td><td>3</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requesttime}">{requesttime}</span></td><td>リクエスト合計時間 (hh:mm:ss)</td><td>00:12:30</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{live-id}">{live-id}</span></td><td>配信ID</td><td>lv345678901</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{live-title}">{live-title}</span></td><td>配信タイトル</td><td>【テスト配信】ボカロ名曲枠</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{end-time}">{end-time}</span></td><td>配信終了予定時刻</td><td>2026/09/16 18:00</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+
     <div style="display:flex; width:100%;">
       <input id="vinfo-command-1" type="text" placeholder="コマンド">
-      <input id="vinfo-comment-1" type="text" style="flex:1;" placeholder="動画情報１行目">
+      <input id="vinfo-comment-1" class="macro-input" data-macro-group="vinfo" data-macro-name="動画情報１行目" type="text" style="flex:1;" placeholder="動画情報１行目">
     </div>
     <div style="display:flex; width:100%;">
       <input id="vinfo-command-2" type="text" placeholder="コマンド">
-      <input id="vinfo-comment-2" type="text" style="flex:1;" placeholder="動画情報２行目">
+      <input id="vinfo-comment-2" class="macro-input" data-macro-group="vinfo" data-macro-name="動画情報２行目" type="text" style="flex:1;" placeholder="動画情報２行目">
     </div>
     <div style="display:flex; width:100%;">
       <input id="vinfo-command-3" type="text" placeholder="コマンド">
-      <input id="vinfo-comment-3" type="text" style="flex:1;" placeholder="動画情報３行目">
+      <input id="vinfo-comment-3" class="macro-input" data-macro-group="vinfo" data-macro-name="動画情報３行目" type="text" style="flex:1;" placeholder="動画情報３行目">
     </div>
     <div style="display:flex; width:100%;">
       <input id="vinfo-command-4" type="text" placeholder="コマンド">
-      <input id="vinfo-comment-4" type="text" style="flex:1;" placeholder="動画情報４行目">
+      <input id="vinfo-comment-4" class="macro-input" data-macro-group="vinfo" data-macro-name="動画情報４行目" type="text" style="flex:1;" placeholder="動画情報４行目">
     </div>
     <div style="margin-top:0.5em;"></div>
     <div>
@@ -157,50 +282,105 @@
         <label><input type="checkbox" id="request-no-ngvideo">NG動画を受け付けない</label>
       </div>
     </div>
-    <div>
+    <div style="margin-bottom: 0.5em;">
       <label><input type="checkbox" id="request-send-reply">リクエストへ応答コメントする</label>
     </div>
-    短期間に連続して運営コメントを送信できないため、リクエスト等が殺到した場合に送信されない場合があります。<br>
-    <br>
+    <div style="font-size: 11.5px; color: #666; margin-bottom: 8px;">
+      ※短期間に連続して運営コメントを送信できないため、リクエスト等が殺到した場合に送信されない場合があります。
+    </div>
+
+    <!-- マクロ入力支援パネル (リクエスト) -->
+    <div class="macro-helper-panel" data-group="request">
+      <div class="macro-toolbar">
+        <span class="macro-toolbar-label">💡 タグをクリックして挿入:</span>
+        <button type="button" class="macro-chip" data-tag="{comment_no}" title="リクエスト主のコメント番号 (例: 128)">+ コメ番号</button>
+        <button type="button" class="macro-chip" data-tag="{title}" title="動画タイトル (例: メルト)">+ タイトル</button>
+        <button type="button" class="macro-chip" data-tag="{id}" title="動画ID (例: sm1715919)">+ 動画ID</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{username}" title="投稿者名 (ユーザーニックネーム)">+ 投稿者名</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{pname}" title="判定されたP名">+ P名</button>
+        <button type="button" class="macro-chip" data-tag="{length}" title="動画再生時間 (例: 04:15)">+ 時間</button>
+        <button type="button" class="macro-chip" data-tag="{date}" title="投稿日時 (例: 2007/12/07 18:24)">+ 投稿日</button>
+        <button type="button" class="macro-chip" data-tag="{view}" title="再生数 (例: 14,235,100)">+ 再生数</button>
+        <button type="button" class="macro-chip" data-tag="{mylist}" title="マイリスト数 (例: 450,120)">+ マイリス</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{requestnum}" title="未再生リクエスト残数">+ 残リク数</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{requesttime}" title="リクエスト合計残時間 (hh:mm:ss)">+ 残リク時間</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{reqstat:受付中:受付停止中}" title="リクエスト受付状態に応じて切り替え (例: {reqstat:受付中:停止中})">+ 受付切替</button>
+      </div>
+
+      <div class="macro-preview-wrapper">
+        <div class="macro-preview-header">
+          <span>👁 プレビュー (<span class="macro-preview-target-name" id="request-preview-target">リクエスト受付時</span>)</span>
+          <span class="macro-char-count" id="request-char-count">0文字</span>
+        </div>
+        <div class="macro-preview-content" id="request-preview-content"></div>
+      </div>
+
+      <details class="macro-reference-details">
+        <summary>📖 使えるタグ一覧と説明（クリックで展開）</summary>
+        <table class="macro-reference-table">
+          <thead>
+            <tr><th>タグ（クリックで挿入）</th><th>説明</th><th>サンプル値</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="macro-table-tag" data-tag="{comment_no}">{comment_no}</span></td><td>リク主のコメント番号</td><td>128</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{title}">{title}</span></td><td>動画タイトル</td><td>メルト</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{id}">{id}</span></td><td>動画ID</td><td>sm1715919</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{username}">{username}</span></td><td>投稿者のニックネーム</td><td>ryo</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{pname}">{pname}</span></td><td>判定されたP名</td><td>ryo(supercell)</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{length}">{length}</span></td><td>再生時間</td><td>04:15</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{date}">{date}</span></td><td>投稿日時</td><td>2007/12/07 18:24</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{view}">{view}</span></td><td>再生回数 (カンマ区切り)</td><td>14,235,100</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{mylist}">{mylist}</span></td><td>マイリスト数 (カンマ区切り)</td><td>450,120</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requestnum}">{requestnum}</span></td><td>未再生リクエスト残数</td><td>3</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requesttime}">{requesttime}</span></td><td>リクエスト合計残時間 (hh:mm:ss)</td><td>00:12:30</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{stocknum}">{stocknum}</span></td><td>未再生ストック残数</td><td>8</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{stocktime}">{stocktime}</span></td><td>ストック合計時間 (hh:mm:ss)</td><td>00:35:10</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{reqstat:受付中:受付停止中}">{reqstat:受付中:受付停止中}</span></td><td>状態に応じて切り替え (書式: {reqstat:受付時:停止時})</td><td>受付中</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{live-title}">{live-title}</span></td><td>配信タイトル</td><td>【テスト配信】ボカロ名曲枠</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+
     <div style="display:flex; width:100%; margin-bottom:0.5em;">
       <div class="label">手動追加リクエストの表示名</div>
-      <input id="request-broadcaster-name" type="text" style="flex:1;" placeholder="放送者">
+      <input id="request-broadcaster-name" class="macro-input" data-macro-group="request" data-macro-name="手動追加リクエストの表示名" type="text" style="flex:1;" placeholder="放送者">
     </div>
     <div style="display:flex; width:100%; margin-bottom:0.5em;">
       <div class="label">IDのみのリクエストの表示名</div>
-      <input id="request-anonymous-name" type="text" style="flex:1;" placeholder="匿名さん">
+      <input id="request-anonymous-name" class="macro-input" data-macro-group="request" data-macro-name="IDのみのリクエストの表示名" type="text" style="flex:1;" placeholder="匿名さん">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">リクエスト受付時</div>
-      <input id="request-accept" type="text" style="flex:1;" placeholder="リクエストを受け付けたとき">
+      <input id="request-accept" class="macro-input" data-macro-group="request" data-macro-name="リクエスト受付時" type="text" style="flex:1;" placeholder="リクエストを受け付けたとき">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">リクエストを受け付けていない時</div>
-      <input id="request-not-allow" type="text" style="flex:1;" placeholder="リクエストを受け付けていないとき">
+      <input id="request-not-allow" class="macro-input" data-macro-group="request" data-macro-name="リクエストを受け付けていない時" type="text" style="flex:1;" placeholder="リクエストを受け付けていないとき">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">生放送で引用再生できない動画の時</div>
-      <input id="request-no-live-play" type="text" style="flex:1;" placeholder="生放送で引用できない動画のとき">
+      <input id="request-no-live-play" class="macro-input" data-macro-group="request" data-macro-name="生放送で引用再生できない動画の時" type="text" style="flex:1;" placeholder="生放送で引用できない動画のとき">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">削除または見つからない時</div>
-      <input id="request-deleted" type="text" style="flex:1;" placeholder="削除または見つからない動画のとき">
+      <input id="request-deleted" class="macro-input" data-macro-group="request" data-macro-name="削除または見つからない時" type="text" style="flex:1;" placeholder="削除または見つからない動画のとき">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">リクエスト済み動画の時</div>
-      <input id="request-duplicated" type="text" style="flex:1;" placeholder="リクエスト済み動画を受け取った時">
+      <input id="request-duplicated" class="macro-input" data-macro-group="request" data-macro-name="リクエスト済み動画の時" type="text" style="flex:1;" placeholder="リクエスト済み動画を受け取った時">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">再生済み動画の時</div>
-      <input id="request-played" type="text" style="flex:1;" placeholder="再生済み動画を受け取った時">
+      <input id="request-played" class="macro-input" data-macro-group="request" data-macro-name="再生済み動画の時" type="text" style="flex:1;" placeholder="再生済み動画を受け取った時">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">リクエスト回数の上限の時</div>
-      <input id="request-max-request" type="text" style="flex:1;" placeholder="リクエスト回数超過の時">
+      <input id="request-max-request" class="macro-input" data-macro-group="request" data-macro-name="リクエスト回数の上限の時" type="text" style="flex:1;" placeholder="リクエスト回数超過の時">
     </div>
     <div style="display:flex; width:100%;">
       <div class="label">NG動画の時</div>
-      <input id="request-ngvideo" type="text" style="flex:1;" placeholder="NG動画を受け取った時">
+      <input id="request-ngvideo" class="macro-input" data-macro-group="request" data-macro-name="NG動画の時" type="text" style="flex:1;" placeholder="NG動画を受け取った時">
     </div>
 
     <div>
@@ -236,18 +416,75 @@
       <label for="discord-webhook-url">Webhook URL:</label>
       <input id="discord-webhook-url" type="text" style="width:100%;" placeholder="https://discord.com/api/webhooks/...">
     </div>
+
+    <!-- マクロ入力支援パネル (Discord) -->
+    <div class="macro-helper-panel" data-group="discord" style="margin-top: 10px;">
+      <div class="macro-toolbar">
+        <span class="macro-toolbar-label">💡 タグをクリックして挿入:</span>
+        <button type="button" class="macro-chip" data-tag="{title}" title="動画タイトル (例: メルト)">+ タイトル</button>
+        <button type="button" class="macro-chip" data-tag="{id}" title="動画ID (例: sm1715919)">+ 動画ID</button>
+        <button type="button" class="macro-chip" data-tag="{length}" title="動画の再生時間 (例: 04:15)">+ 時間</button>
+        <button type="button" class="macro-chip" data-tag="{date}" title="投稿日時 (例: 2007/12/07 18:24)">+ 投稿日</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{username}" title="投稿者名 (ユーザーニックネーム)">+ 投稿者名</button>
+        <button type="button" class="macro-chip chip-green" data-tag="{pname}" title="判定されたP名">+ P名</button>
+        <button type="button" class="macro-chip" data-tag="{view}" title="再生数 (例: 14,235,100)">+ 再生数</button>
+        <button type="button" class="macro-chip" data-tag="{comment}" title="コメント数 (例: 3,580,210)">+ コメ数</button>
+        <button type="button" class="macro-chip" data-tag="{mylist}" title="マイリスト数 (例: 450,120)">+ マイリス</button>
+        <button type="button" class="macro-chip" data-tag="{comment_no}" title="リク主のコメント番号 (例: 128)">+ コメ番号</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{requestnum}" title="未再生リクエスト残数">+ 残リク数</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{live-id}" title="配信ID (例: lv345678901)">+ 配信ID</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{live-title}" title="配信タイトル">+ 配信タイトル</button>
+        <button type="button" class="macro-chip chip-purple" data-tag="{end-time}" title="配信終了予定時刻">+ 終了時刻</button>
+      </div>
+
+      <div class="macro-preview-wrapper">
+        <div class="macro-preview-header">
+          <span>👁 プレビュー (<span class="macro-preview-target-name" id="discord-preview-target">動画再生時</span>)</span>
+          <span class="macro-char-count" id="discord-char-count">0文字</span>
+        </div>
+        <div class="macro-preview-content" id="discord-preview-content"></div>
+      </div>
+
+      <details class="macro-reference-details">
+        <summary>📖 使えるタグ一覧と説明（クリックで展開）</summary>
+        <table class="macro-reference-table">
+          <thead>
+            <tr><th>タグ（クリックで挿入）</th><th>説明</th><th>サンプル値</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="macro-table-tag" data-tag="{title}">{title}</span></td><td>動画タイトル</td><td>メルト</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{id}">{id}</span></td><td>動画ID</td><td>sm1715919</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{length}">{length}</span></td><td>再生時間</td><td>04:15</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{date}">{date}</span></td><td>投稿日時</td><td>2007/12/07 18:24</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{username}">{username}</span></td><td>投稿者のニックネーム</td><td>ryo</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{pname}">{pname}</span></td><td>判定されたP名</td><td>ryo(supercell)</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{view}">{view}</span></td><td>再生回数 (カンマ区切り)</td><td>14,235,100</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{comment}">{comment}</span></td><td>コメント数 (カンマ区切り)</td><td>3,580,210</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{mylist}">{mylist}</span></td><td>マイリスト数 (カンマ区切り)</td><td>450,120</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{comment_no}">{comment_no}</span></td><td>リク主のコメント番号</td><td>128</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requestnum}">{requestnum}</span></td><td>未再生リクエスト残数</td><td>3</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{requesttime}">{requesttime}</span></td><td>リクエスト合計残時間 (hh:mm:ss)</td><td>00:12:30</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{stocknum}">{stocknum}</span></td><td>未再生ストック残数</td><td>8</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{live-id}">{live-id}</span></td><td>配信ID</td><td>lv345678901</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{live-title}">{live-title}</span></td><td>配信タイトル</td><td>【テスト配信】ボカロ名曲枠</td></tr>
+            <tr><td><span class="macro-table-tag" data-tag="{end-time}">{end-time}</span></td><td>配信終了予定時刻</td><td>2026/09/16 18:00</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
+
     <div style="margin-top:0.5em;">
       <label><input type="checkbox" id="discord-on-play">動画再生時に送信</label>
     </div>
     <div>
       <!-- テキスト欄を textarea に変更し、改行を入力できるようにする -->
-      <textarea id="discord-text" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
+      <textarea id="discord-text" class="macro-input" data-macro-group="discord" data-macro-name="動画再生時" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
     </div>
     <div style="margin-top:0.5em;">
       <label><input type="checkbox" id="discord-on-request">リクエスト受付時に送信</label>
     </div>
     <div>
-      <textarea id="discord-request-text" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
+      <textarea id="discord-request-text" class="macro-input" data-macro-group="discord" data-macro-name="リクエスト受付時" placeholder="送信する内容" style="width:100%;height:4em;resize:vertical;"></textarea>
     </div>
     <div style="margin-top:0.5em;">
       <!-- テスト用も textarea にして改行確認ができるように -->
