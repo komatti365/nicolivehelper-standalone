@@ -300,11 +300,11 @@ var NicoLiveComment = {
 
         // sm,nmにリンクを貼り付け.
         str = str.replace( /((sm|nm)\d+)/g,
-            "<a target=\"_blank\" href=\"http://www.nicovideo.jp/watch/$1\">$1</a>" );
+            "<a target=\"_blank\" href=\"https://www.nicovideo.jp/watch/$1\">$1</a>" );
         if( comment.premium != 3 ){
             // 数字10桁にもリンク.
             if( !str.match( /(sm|nm)\d+/ ) ){
-                str = str.replace( /(\d{10})/g, "<a target=\"_blank\" href=\"http://www.nicovideo.jp/watch/$1\">$1</a>" );
+                str = str.replace( /(\d{10})/g, "<a target=\"_blank\" href=\"https://www.nicovideo.jp/watch/$1\">$1</a>" );
             }
         }
         try{

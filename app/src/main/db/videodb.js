@@ -311,7 +311,7 @@ var VideoDB = {
         let sec = parseInt( item.length_ms / 1000 % 60 );
 
         $( elem.querySelector( '.video-title' ) ).text( `${item.video_id} ${item.title}` );
-        $( elem.querySelector( '.open-page' ) ).attr( 'href', `http://www.nicovideo.jp/watch/${item.video_id}` );
+        $( elem.querySelector( '.open-page' ) ).attr( 'href', `https://www.nicovideo.jp/watch/${item.video_id}` );
 
         details.appendChild( document.createTextNode( "投稿:" + posteddate + " 時間:" + (min + ":" + (sec < 10 ? ("0" + sec) : sec)) ) );
         details.appendChild( document.createElement( 'br' ) );

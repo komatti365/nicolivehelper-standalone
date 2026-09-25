@@ -2072,7 +2072,7 @@ var NicoLiveHelper = {
             $( title ).addClass( 'self_request' );
         }
 
-        link.setAttribute( "href", "http://www.nicovideo.jp/watch/" + vinfo.video_id );
+        link.setAttribute( "href", "https://www.nicovideo.jp/watch/" + vinfo.video_id );
 
         thumbnail_image.src = vinfo.thumbnail_url;
         thumbnail_image.addEventListener( 'mouseover', ( ev ) => {
@@ -2099,7 +2099,7 @@ var NicoLiveHelper = {
                 if( s.match( /mylist\/\d+/ ) ){
                     let a = document.createElement( 'a' );
                     let mylist = s;
-                    a.setAttribute( "href", "http://www.nicovideo.jp/" + mylist );
+                    a.setAttribute( "href", "https://www.nicovideo.jp/" + mylist );
                     a.setAttribute( "target", "_blank" );
                     a.setAttribute( "style", "text-decoration: underline;" );
                     a.appendChild( document.createTextNode( s ) );
@@ -2107,7 +2107,7 @@ var NicoLiveHelper = {
                 }else if( s.match( /(sm|nm)\d+/ ) ){
                     let a = document.createElement( 'a' );
                     let vid = s;
-                    a.setAttribute( "href", "http://www.nicovideo.jp/watch/" + vid );
+                    a.setAttribute( "href", "https://www.nicovideo.jp/watch/" + vid );
                     a.setAttribute( "target", "_blank" );
                     a.setAttribute( "style", "text-decoration: underline;" );
 

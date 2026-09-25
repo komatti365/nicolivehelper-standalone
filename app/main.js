@@ -236,6 +236,25 @@ async function logout() {
   console.log('[STSen] Logging out...');
   try {
     const cookies = await session.defaultSession.cookies.get({ domain: 'nicovideo.jp' });
+
+    // サーバー側のセッションも無効化リクエスト（可能な場合）
+    const userSession = cookies.find(c => (c.name === 'user_session' || c.name === 'user_session_secure') && c.value);
+    if (userSession) {
+      try {
+        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+        await fetch('https://account.nicovideo.jp/logout', {
+          headers: {
+            'Cookie': cookieHeader,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          signal: AbortSignal.timeout(3000)
+        });
+      } catch (e) {
+        console.warn('[STSen:Logout] Remote logout request warning:', e.message);
+      }
+    }
+
+    // Electron 内の Cookie を完全に消去
     for (const c of cookies) {
       try {
         let domain = c.domain || '.nicovideo.jp';
@@ -243,9 +262,11 @@ async function logout() {
         await session.defaultSession.cookies.remove(`https://${cleanDomain}${c.path || '/'}`, c.name);
       } catch (e) {}
     }
+    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
+
     cachedCookies = [];
     if (fs.existsSync(COOKIE_FILE)) {
-      fs.unlinkSync(COOKIE_FILE);
+      try { fs.unlinkSync(COOKIE_FILE); } catch (e) {}
     }
     broadcastAccountStatus();
     console.log('[STSen] Logged out successfully.');
@@ -615,8 +636,28 @@ function createSubWindow(subUrl, options = {}) {
 // -------------------------------------------------------------
 // Chromium 系実機ブラウザ（Edge, Chrome, Brave, Vivaldi, Opera 等）の自動検出
 // -------------------------------------------------------------
+function isChromiumExe(exePath) {
+  if (!exePath) return false;
+  const lower = path.basename(exePath).toLowerCase();
+  return (
+    lower === 'chrome.exe' ||
+    lower === 'msedge.exe' ||
+    lower === 'brave.exe' ||
+    lower === 'vivaldi.exe' ||
+    lower === 'launcher.exe' || // Opera
+    lower === 'chromium.exe' ||
+    lower === 'google-chrome' ||
+    lower === 'google-chrome-stable' ||
+    lower === 'microsoft-edge' ||
+    lower === 'microsoft-edge-stable' ||
+    lower === 'chromium' ||
+    lower === 'brave' ||
+    lower === 'vivaldi'
+  );
+}
+
 function getChromiumBrowserPath() {
-  if (process.platform !== 'win32') {
+  if (process.platform === 'linux') {
     const linuxCandidates = [
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
@@ -624,32 +665,96 @@ function getChromiumBrowserPath() {
       '/usr/bin/chromium-browser',
       '/usr/bin/microsoft-edge',
       '/usr/bin/microsoft-edge-stable',
+      '/usr/bin/brave-browser',
+      '/usr/bin/vivaldi-stable',
       '/snap/bin/chromium'
     ];
     for (const p of linuxCandidates) {
       if (fs.existsSync(p)) {
-        console.log(`[STSen:Browser] Detected Linux Chromium browser by path: ${p}`);
+        console.log(`[STSen:Browser] Detected Linux Chromium browser: ${p}`);
         return p;
       }
     }
     return null;
   }
 
+  if (process.platform === 'darwin') {
+    const macCandidates = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+      '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+      '/Applications/Vivaldi.app/Contents/MacOS/Vivaldi',
+      '/Applications/Opera.app/Contents/MacOS/Opera'
+    ];
+    for (const p of macCandidates) {
+      if (fs.existsSync(p)) {
+        console.log(`[STSen:Browser] Detected macOS Chromium browser: ${p}`);
+        return p;
+      }
+    }
+    return null;
+  }
+
+  // Windows
+  const { execSync } = require('child_process');
+
+  // 1. Windows の「既定のブラウザ（Default Browser）」をレジストリから最優先で取得
+  try {
+    const progIdOut = execSync('reg query "HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice" /v ProgId', {
+      encoding: 'utf8',
+      windowsHide: true
+    });
+    const progMatch = progIdOut.match(/ProgId\s+REG_SZ\s+([^\r\n]+)/);
+    if (progMatch && progMatch[1]) {
+      const progId = progMatch[1].trim();
+      console.log(`[STSen:Browser] Windows default https handler ProgId: ${progId}`);
+
+      const checkCmdReg = (rootKey) => {
+        try {
+          const cmdOut = execSync(`reg query "${rootKey}\\${progId}\\shell\\open\\command" /ve`, {
+            encoding: 'utf8',
+            windowsHide: true
+          });
+          const cmdMatch = cmdOut.match(/REG_SZ\s+([^\r\n]+)/);
+          if (cmdMatch && cmdMatch[1]) {
+            const rawCmd = cmdMatch[1].trim();
+            const exeMatch = rawCmd.match(/^"([^"]+)"/) || rawCmd.match(/^([^\s]+)/);
+            if (exeMatch && fs.existsSync(exeMatch[1])) {
+              return exeMatch[1];
+            }
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      const defaultBrowserExe = checkCmdReg('HKCU\\Software\\Classes') || checkCmdReg('HKLM\\SOFTWARE\\Classes') || checkCmdReg('HKCR');
+      if (defaultBrowserExe && isChromiumExe(defaultBrowserExe)) {
+        console.log(`[STSen:Browser] Using user's default browser (Chromium-based): ${defaultBrowserExe}`);
+        return defaultBrowserExe;
+      } else if (defaultBrowserExe) {
+        console.log(`[STSen:Browser] Default browser is non-Chromium (${defaultBrowserExe}), falling back to detected Chromium browsers.`);
+      }
+    }
+  } catch (err) {
+    console.warn('[STSen:Browser] Could not detect default browser from registry:', err.message);
+  }
+
+  // 2. 既定ブラウザが非Chromiumまたは取得できなかった場合、インストールされているChromium系ブラウザを検索
+  // ※Chrome, Edge, Brave, Vivaldi, Opera の順
   const localAppData = process.env.LOCALAPPDATA || '';
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
   const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
 
-  // 1. 一般的な既知のインストール先パス（Edge, Chrome, Brave, Vivaldi, Opera）
   const candidates = [
-    // Microsoft Edge
-    path.join(programFilesX86, 'Microsoft/Edge/Application/msedge.exe'),
-    path.join(programFiles, 'Microsoft/Edge/Application/msedge.exe'),
-    path.join(localAppData, 'Microsoft/Edge/Application/msedge.exe'),
-
-    // Google Chrome
+    // Google Chrome（最優先フォールバック）
     path.join(programFiles, 'Google/Chrome/Application/chrome.exe'),
     path.join(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
     path.join(localAppData, 'Google/Chrome/Application/chrome.exe'),
+
+    // Microsoft Edge（Windows標準）
+    path.join(programFilesX86, 'Microsoft/Edge/Application/msedge.exe'),
+    path.join(programFiles, 'Microsoft/Edge/Application/msedge.exe'),
+    path.join(localAppData, 'Microsoft/Edge/Application/msedge.exe'),
 
     // Brave
     path.join(programFiles, 'BraveSoftware/Brave-Browser/Application/brave.exe'),
@@ -673,64 +778,52 @@ function getChromiumBrowserPath() {
     }
   }
 
-  // 2. レジストリ（App Paths）からの検索フォールバック (Windowsのみ)
+  // 3. レジストリ（App Paths）からの検索フォールバック (Windows)
   try {
-    const { execSync } = require('child_process');
-    const regNames = ['msedge.exe', 'chrome.exe', 'brave.exe', 'vivaldi.exe'];
+    const regNames = ['chrome.exe', 'msedge.exe', 'brave.exe', 'vivaldi.exe'];
     for (const name of regNames) {
-      try {
-        const out = execSync(`reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
-          encoding: 'utf8',
-          windowsHide: true
-        });
-        const match = out.match(/REG_SZ\s+([^\r\n]+)/);
-        if (match && fs.existsSync(match[1].trim())) {
-          const found = match[1].trim();
-          console.log(`[STSen:Browser] Detected Chromium browser from registry: ${found}`);
-          return found;
-        }
-      } catch (e) {}
-
-      try {
-        const out = execSync(`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${name}" /ve`, {
-          encoding: 'utf8',
-          windowsHide: true
-        });
-        const match = out.match(/REG_SZ\s+([^\r\n]+)/);
-        if (match && fs.existsSync(match[1].trim())) {
-          const found = match[1].trim();
-          console.log(`[STSen:Browser] Detected Chromium browser from HKCU registry: ${found}`);
-          return found;
-        }
-      } catch (e) {}
+      for (const root of ['HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths']) {
+        try {
+          const out = execSync(`reg query "${root}\\${name}" /ve`, {
+            encoding: 'utf8',
+            windowsHide: true
+          });
+          const match = out.match(/REG_SZ\s+([^\r\n]+)/);
+          if (match && fs.existsSync(match[1].trim())) {
+            const found = match[1].trim();
+            console.log(`[STSen:Browser] Detected Chromium browser from registry (${name}): ${found}`);
+            return found;
+          }
+        } catch (e) {}
+      }
     }
   } catch (err) {}
 
   return null;
 }
 
-let edgeLoginProcess = null;
-let edgeCdpWs = null;
-let edgeLoginTimeout = null;
+let browserLoginProcess = null;
+let browserCdpWs = null;
+let browserLoginTimeout = null;
 
-async function openEdgeLogin() {
-  console.log('[STSen:EdgeLogin] openEdgeLogin() called');
-  if (edgeLoginProcess) {
-    console.log('[STSen:EdgeLogin] Previous Edge process detected. Restarting for fresh login attempt...');
-    try { edgeLoginProcess.kill(); } catch (e) {}
-    edgeLoginProcess = null;
-    if (edgeCdpWs) {
-      try { edgeCdpWs.close(); } catch (e) {}
-      edgeCdpWs = null;
+async function openBrowserLogin() {
+  console.log('[STSen:BrowserLogin] openBrowserLogin() called');
+  if (browserLoginProcess) {
+    console.log('[STSen:BrowserLogin] Previous browser process detected. Restarting for fresh login attempt...');
+    try { browserLoginProcess.kill(); } catch (e) {}
+    browserLoginProcess = null;
+    if (browserCdpWs) {
+      try { browserCdpWs.close(); } catch (e) {}
+      browserCdpWs = null;
     }
-    if (edgeLoginTimeout) {
-      clearTimeout(edgeLoginTimeout);
-      edgeLoginTimeout = null;
+    if (browserLoginTimeout) {
+      clearTimeout(browserLoginTimeout);
+      browserLoginTimeout = null;
     }
   }
 
-  const edgeExe = getChromiumBrowserPath();
-  if (!edgeExe) {
+  const browserExe = getChromiumBrowserPath();
+  if (!browserExe) {
     console.warn('[STSen:Browser] No Chromium-based browser found on system.');
     const result = await dialog.showMessageBox(mainWindow || null, {
       type: 'warning',
@@ -738,8 +831,8 @@ async function openEdgeLogin() {
       defaultId: 0,
       cancelId: 1,
       title: 'ブラウザが見つかりません - New NicoLive Helper',
-      message: 'ログインに必要なブラウザ（Microsoft Edge または Google Chrome 等）が見つかりませんでした。',
-      detail: 'Cloudflare Turnstile等のセキュリティ認証を安全に通過してログインを完了するため、Google Chromeのインストールをおすすめします。\n\n公式ダウンロードページを開きますか？'
+      message: 'ログインに必要なブラウザ（Google Chrome または Microsoft Edge 等）が見つかりませんでした。',
+      detail: 'Cloudflare Turnstile等のセキュリティ認証を安全に通過してログインを完了するため、Google ChromeまたはMicrosoft Edge等のChromium系ブラウザが必要です。\n\nChrome公式ダウンロードページを開きますか？'
     });
 
     if (result.response === 0) {
@@ -755,6 +848,9 @@ async function openEdgeLogin() {
 
   // 固定ポートではなくランダムな動的ポートを使用（無認証CDPへの不正アクセス防止）
   const CDP_PORT = Math.floor(Math.random() * (65535 - 49152 + 1)) + 49152;
+  const browserBaseName = path.basename(browserExe).toLowerCase();
+  const isEdge = browserBaseName === 'msedge.exe';
+
   const args = [
     `--remote-debugging-port=${CDP_PORT}`,
     '--remote-debugging-address=127.0.0.1',
@@ -762,47 +858,45 @@ async function openEdgeLogin() {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-sync',
-    '--disable-features=msEdgeSyncPrompt,msFirstRun',
-    '--window-size=600,750',
+    '--window-size=650,800',
     '--app=https://account.nicovideo.jp/login?site=niconico'
   ];
 
-  console.log(`[STSen:EdgeLogin] Launching browser: ${edgeExe} on port ${CDP_PORT}`);
+  if (isEdge) {
+    args.push('--disable-features=msEdgeSyncPrompt,msFirstRun');
+  }
+
+  console.log(`[STSen:BrowserLogin] Launching browser (${browserBaseName}): ${browserExe} on port ${CDP_PORT}`);
   const { spawn } = require('child_process');
-  edgeLoginProcess = spawn(edgeExe, args);
+  browserLoginProcess = spawn(browserExe, args);
 
   // 3分間のタイムアウト保護（放置された場合の自動終了）
-  edgeLoginTimeout = setTimeout(() => {
-    if (edgeLoginProcess) {
-      console.log('[STSen:EdgeLogin] Login process timed out (3 minutes). Closing browser.');
-      try { edgeLoginProcess.kill(); } catch (e) {}
-      edgeLoginProcess = null;
-    }
-    if (edgeCdpWs) {
-      try { edgeCdpWs.close(); } catch (e) {}
-      edgeCdpWs = null;
+  browserLoginTimeout = setTimeout(() => {
+    if (browserLoginProcess) {
+      console.log('[STSen:BrowserLogin] Login process timed out (3 minutes). Closing browser.');
+      closeBrowserGracefully();
     }
   }, 180000);
 
-  edgeLoginProcess.on('error', (err) => {
-    console.error('[STSen:EdgeLogin] Failed to start browser process:', err);
-    edgeLoginProcess = null;
-    if (edgeLoginTimeout) {
-      clearTimeout(edgeLoginTimeout);
-      edgeLoginTimeout = null;
+  browserLoginProcess.on('error', (err) => {
+    console.error('[STSen:BrowserLogin] Failed to start browser process:', err);
+    browserLoginProcess = null;
+    if (browserLoginTimeout) {
+      clearTimeout(browserLoginTimeout);
+      browserLoginTimeout = null;
     }
   });
 
-  edgeLoginProcess.on('exit', (code) => {
-    console.log(`[STSen:EdgeLogin] Browser process exited with code: ${code}`);
-    edgeLoginProcess = null;
-    if (edgeLoginTimeout) {
-      clearTimeout(edgeLoginTimeout);
-      edgeLoginTimeout = null;
+  browserLoginProcess.on('exit', (code) => {
+    console.log(`[STSen:BrowserLogin] Browser process exited with code: ${code}`);
+    browserLoginProcess = null;
+    if (browserLoginTimeout) {
+      clearTimeout(browserLoginTimeout);
+      browserLoginTimeout = null;
     }
-    if (edgeCdpWs) {
-      try { edgeCdpWs.close(); } catch (e) {}
-      edgeCdpWs = null;
+    if (browserCdpWs) {
+      try { browserCdpWs.close(); } catch (e) {}
+      browserCdpWs = null;
     }
   });
 
@@ -811,7 +905,7 @@ async function openEdgeLogin() {
   const pollInterval = 500;
 
   const waitForCdp = async () => {
-    if (!edgeLoginProcess) return;
+    if (!browserLoginProcess) return;
 
     try {
       const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
@@ -821,7 +915,7 @@ async function openEdgeLogin() {
           || targets.find(t => t.type === 'page' && !t.url.startsWith('edge://') && !t.url.startsWith('chrome://'));
 
         if (pageTarget && pageTarget.webSocketDebuggerUrl) {
-          console.log(`[STSen:EdgeLogin] Found page target (${pageTarget.url}), connecting to CDP WebSocket...`);
+          console.log(`[STSen:BrowserLogin] Found page target (${pageTarget.url}), connecting to CDP WebSocket...`);
           startCdpMonitoring(pageTarget.webSocketDebuggerUrl);
           return;
         }
@@ -829,34 +923,94 @@ async function openEdgeLogin() {
     } catch (e) {}
 
     attempts++;
-    if (attempts < maxAttempts && edgeLoginProcess) {
+    if (attempts < maxAttempts && browserLoginProcess) {
       setTimeout(waitForCdp, pollInterval);
-    } else if (edgeLoginProcess) {
-      console.warn('[STSen:EdgeLogin] Timed out waiting for CDP port or login target.');
+    } else if (browserLoginProcess) {
+      console.warn('[STSen:BrowserLogin] Timed out waiting for CDP port or login target.');
     }
   };
 
   setTimeout(waitForCdp, 600);
 }
 
-function startCdpMonitoring(wsUrl) {
-  if (edgeCdpWs) {
-    try { edgeCdpWs.close(); } catch (e) {}
-    edgeCdpWs = null;
+// 互換性維持のためのエイリアス
+const openEdgeLogin = openBrowserLogin;
+
+function closeBrowserGracefully() {
+  if (!browserLoginProcess) return;
+
+  console.log('[STSen:BrowserLogin] Requesting graceful browser shutdown via CDP (Browser.close)...');
+  if (browserCdpWs && browserCdpWs.readyState === WebSocket.OPEN) {
+    try {
+      browserCdpWs.send(JSON.stringify({ id: 9999, method: 'Browser.close' }));
+    } catch (e) {
+      console.warn('[STSen:BrowserLogin] Failed to send Browser.close:', e.message);
+    }
   }
 
-  edgeCdpWs = new WebSocket(wsUrl);
+  // 正常終了を待機。もし3秒経ってもプロセスが残っている場合はフォールバックとして強制終了
+  setTimeout(() => {
+    if (browserLoginProcess) {
+      console.log('[STSen:BrowserLogin] Browser did not exit gracefully, fallback to terminate process.');
+      try { browserLoginProcess.kill(); } catch (e) {}
+      browserLoginProcess = null;
+    }
+  }, 3000);
+}
+
+function startCdpMonitoring(wsUrl) {
+  if (browserCdpWs) {
+    try { browserCdpWs.close(); } catch (e) {}
+    browserCdpWs = null;
+  }
+
+  browserCdpWs = new WebSocket(wsUrl);
 
   let checkTimer = null;
   let msgId = 1;
+  let loginCompleted = false;
+  let sessionReady = false;
 
-  edgeCdpWs.on('open', () => {
-    console.log('[STSen:EdgeLogin] Connected to CDP WebSocket! Starting cookie monitoring...');
-    edgeCdpWs.send(JSON.stringify({ id: msgId++, method: 'Network.enable' }));
+  browserCdpWs.on('open', () => {
+    console.log('[STSen:BrowserLogin] Connected to CDP WebSocket! Preparing clean login session...');
+    browserCdpWs.send(JSON.stringify({ id: msgId++, method: 'Network.enable' }));
+    browserCdpWs.send(JSON.stringify({ id: msgId++, method: 'Page.enable' }));
+
+    // 重要な処理：
+    // ブラウザに保存されていた前回の「古いセッション（user_session）」のみを削除する。
+    // ※ブラウザのパスワード保存（オートコンプリート）や二段階認証の端末記憶（nicosid等）はそのまま維持される！
+    // これにより、「ログアウト後に再度ログイン画面を開いた際、前のアカウントで勝手にログイン完了してブラウザが閉じる」という事故を防止し、
+    // 必ずログインフォームが表示され、ユーザーがID/PW確認（または別アカウントへの切り替え）を行えるようにする。
+    const domainsToDelete = ['.nicovideo.jp', 'account.nicovideo.jp', 'nicovideo.jp'];
+    for (const d of domainsToDelete) {
+      browserCdpWs.send(JSON.stringify({
+        id: msgId++,
+        method: 'Network.deleteCookies',
+        params: { name: 'user_session', domain: d }
+      }));
+      browserCdpWs.send(JSON.stringify({
+        id: msgId++,
+        method: 'Network.deleteCookies',
+        params: { name: 'user_session_secure', domain: d }
+      }));
+    }
+
+    // 古いセッション削除後に確実にログインフォームが表示されるようログインURLにリロード/遷移
+    browserCdpWs.send(JSON.stringify({
+      id: msgId++,
+      method: 'Page.navigate',
+      params: { url: 'https://account.nicovideo.jp/login?site=niconico' }
+    }));
+
+    // 古いセッション削除とページ遷移が完了するまで一時的に検知をガード（1秒）
+    setTimeout(() => {
+      sessionReady = true;
+      console.log('[STSen:BrowserLogin] Ready for user authentication.');
+    }, 1200);
 
     checkTimer = setInterval(() => {
-      if (edgeCdpWs && edgeCdpWs.readyState === WebSocket.OPEN) {
-        edgeCdpWs.send(JSON.stringify({
+      if (browserCdpWs && browserCdpWs.readyState === WebSocket.OPEN && !loginCompleted && sessionReady) {
+        browserCdpWs.send(JSON.stringify({
           id: 100,
           method: 'Network.getAllCookies'
         }));
@@ -864,14 +1018,15 @@ function startCdpMonitoring(wsUrl) {
     }, 1000);
   });
 
-  edgeCdpWs.on('message', async (raw) => {
+  browserCdpWs.on('message', async (raw) => {
     try {
       const data = JSON.parse(raw.toString());
-      if (data.id === 100 && data.result && Array.isArray(data.result.cookies)) {
+      if (data.id === 100 && data.result && Array.isArray(data.result.cookies) && !loginCompleted && sessionReady) {
         const cookies = data.result.cookies;
         const userSession = cookies.find(c => (c.name === 'user_session' || c.name === 'user_session_secure') && c.value);
         if (userSession) {
-          console.log('[STSen:EdgeLogin] user_session detected in browser! Saving session...');
+          loginCompleted = true;
+          console.log('[STSen:BrowserLogin] user_session detected in browser! Saving session & persisting profile...');
           if (checkTimer) {
             clearInterval(checkTimer);
             checkTimer = null;
@@ -881,36 +1036,67 @@ function startCdpMonitoring(wsUrl) {
           await updateCookies(nicoCookies.length > 0 ? nicoCookies : cookies);
           broadcastAccountStatus();
 
-          setTimeout(() => {
-            if (edgeLoginProcess) {
-              console.log('[STSen:EdgeLogin] Closing browser window automatically.');
-              try { edgeLoginProcess.kill(); } catch (e) {}
-              edgeLoginProcess = null;
+          // ユーザーにログイン成功を視覚的に通知するバナーをページ内に挿入
+          try {
+            if (browserCdpWs && browserCdpWs.readyState === WebSocket.OPEN) {
+              browserCdpWs.send(JSON.stringify({
+                id: msgId++,
+                method: 'Runtime.evaluate',
+                params: {
+                  expression: `
+                    (() => {
+                      if (document.getElementById('stsen-login-banner')) return;
+                      const banner = document.createElement('div');
+                      banner.id = 'stsen-login-banner';
+                      banner.style.position = 'fixed';
+                      banner.style.top = '0';
+                      banner.style.left = '0';
+                      banner.style.right = '0';
+                      banner.style.backgroundColor = '#10b981';
+                      banner.style.color = '#ffffff';
+                      banner.style.padding = '12px 20px';
+                      banner.style.fontSize = '15px';
+                      banner.style.fontWeight = 'bold';
+                      banner.style.textAlign = 'center';
+                      banner.style.zIndex = '2147483647';
+                      banner.style.boxShadow = '0 3px 12px rgba(0,0,0,0.3)';
+                      banner.innerText = '✓ ログインに成功しました！認証情報を保存し、ブラウザを終了しています...';
+                      document.body.appendChild(banner);
+                    })()
+                  `
+                }
+              }));
             }
-          }, 1000);
+          } catch (e) {}
+
+          // ブラウザが二段階認証情報やCookie、パスワード保存をディスクに安全にコミットできるよう猶予（2.5秒）を設けて正常終了
+          setTimeout(() => {
+            console.log('[STSen:BrowserLogin] Closing browser window gracefully after session persistence delay.');
+            closeBrowserGracefully();
+          }, 2500);
         }
       }
     } catch (e) {
-      console.error('[STSen:EdgeLogin] Message parsing error:', e);
+      console.error('[STSen:BrowserLogin] Message parsing error:', e);
     }
   });
 
-  edgeCdpWs.on('close', () => {
-    console.log('[STSen:EdgeLogin] CDP WebSocket closed.');
+  browserCdpWs.on('close', () => {
+    console.log('[STSen:BrowserLogin] CDP WebSocket closed.');
     if (checkTimer) {
       clearInterval(checkTimer);
       checkTimer = null;
     }
-    edgeCdpWs = null;
+    browserCdpWs = null;
   });
 
-  edgeCdpWs.on('error', (err) => {
-    console.error('[STSen:EdgeLogin] CDP WebSocket error:', err.message);
+  browserCdpWs.on('error', (err) => {
+    console.error('[STSen:BrowserLogin] CDP WebSocket error:', err.message);
     if (checkTimer) {
       clearInterval(checkTimer);
       checkTimer = null;
     }
-    edgeCdpWs = null;
+    browserCdpWs = null;
   });
 }
 
@@ -1098,10 +1284,10 @@ ipcMain.handle('get-all-liveinfo', () => liveProp);
 ipcMain.handle('open-login-window', async () => {
   console.log('[STSen] IPC: open-login-window received. Starting browser login...');
   try {
-    await openEdgeLogin();
+    await openBrowserLogin();
     return { success: true };
   } catch (err) {
-    console.error('[STSen] Error during openEdgeLogin():', err);
+    console.error('[STSen] Error during openBrowserLogin():', err);
     return { success: false, error: err.message };
   }
 });
@@ -1244,6 +1430,37 @@ ipcMain.handle('get-cookies-for-sync', async () => {
     httpOnly: c.httpOnly,
     expirationDate: c.expirationDate
   }));
+});
+
+// 全 WebContents（メイン画面、window.open で開いたマイリストマネージャー・動画DB等の子ウィンドウ）共通のリンクハンドラ
+app.on('web-contents-created', (event, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      console.log(`[STSen] Opening external URL in default browser: ${url}`);
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: getWebPreferences(),
+        autoHideMenuBar: true
+      }
+    };
+  });
+
+  contents.on('will-navigate', (event, navigationUrl) => {
+    if (navigationUrl.startsWith('http://') || navigationUrl.startsWith('https://')) {
+      console.log(`[STSen] Intercepting navigation to external browser: ${navigationUrl}`);
+      event.preventDefault();
+      shell.openExternal(navigationUrl);
+    }
+  });
+});
+
+// 新規生成されるすべてのウィンドウでメニューバーを非表示
+app.on('browser-window-created', (event, win) => {
+  win.setMenuBarVisibility(false);
 });
 
 // アプリ起動フロー

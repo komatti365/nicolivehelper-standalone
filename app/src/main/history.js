@@ -86,7 +86,7 @@ var NicoLiveHistory = {
         let link = elem.querySelector( '.nico-link' );
         let playtime = elem.querySelector( '.nico-playtime' );
 
-        link.setAttribute( "href", "http://www.nicovideo.jp/watch/" + vinfo.video_id );
+        link.setAttribute( "href", "https://www.nicovideo.jp/watch/" + vinfo.video_id );
 
         thumbnail_image.src = vinfo.thumbnail_url;
         thumbnail_image.addEventListener( 'mouseover', ( ev ) => {
