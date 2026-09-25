@@ -273,8 +273,8 @@ window.RemoteClient = {
         NicoLiveRequest.createTable();
       }
       if (typeof NicoLiveHelper !== 'undefined') {
-        $('#community-id').text(NicoLiveHelper.liveProp && NicoLiveHelper.liveProp.community ? NicoLiveHelper.liveProp.community.id : 'co000000');
-        $('#live-title').text(NicoLiveHelper.liveProp && NicoLiveHelper.liveProp.program ? NicoLiveHelper.liveProp.program.title : '[オフライン]');
+        const titleText = NicoLiveHelper.liveProp && NicoLiveHelper.liveProp.program ? NicoLiveHelper.liveProp.program.title : '[オフライン]';
+        $('#live-title').text(titleText).attr('title', titleText);
       }
     }
   },
@@ -286,8 +286,8 @@ window.RemoteClient = {
     // 1. 枠情報
     if (state.liveInfo) {
       const info = state.liveInfo;
-      $('#live-title').text(info.title ? `[リモート] ${info.title}` : '[リモート: オフライン]');
-      $('#community-id').text(info.communityId || 'co------');
+      const remoteTitle = info.title ? `[リモート] ${info.title}` : '[リモート: オフライン]';
+      $('#live-title').text(remoteTitle).attr('title', info.title || remoteTitle);
       $('#live-caster').text(info.casterName || '---');
       if (info.lvid) {
         $('#input-manual-lvid').val(info.lvid);
