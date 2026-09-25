@@ -158,19 +158,26 @@ footer {
     overflow: scroll;
 }
 
-/* prevent header fields from overflowing when long titles are used */
-#community-id, #live-title, #live-caster {
+/* ヘッダー1行目のテキスト表示スタイル（1行目を横幅最大まで使ってタイトルを表示） */
+#live-caster {
     display: inline-block;
     vertical-align: middle;
-    max-width: 30%; /* allow a reasonable portion of the header width */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 140px;
 }
 
 #live-title {
-    /* give a little more room specifically for the title */
-    max-width: 50%;
+    display: inline-block;
+    vertical-align: middle;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none; /* 制限を解除して利用可能な幅を最大まで使用 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: bold;
 }
 
 .my-alert {

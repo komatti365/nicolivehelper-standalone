@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, session, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const url = require('url');
 const WebSocket = require('ws');
 const RemoteServer = require('./remoteServer');
 
@@ -292,7 +293,9 @@ async function fetchLiveInfoDirect(lvid) {
   console.log(`[STSen] Fetching liveinfo directly for: ${idWithLv}...`);
   try {
     const url = `https://live.nicovideo.jp/watch/${idWithLv}`;
-    const cookieHeader = cachedCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const cookies = await session.defaultSession.cookies.get({ domain: 'nicovideo.jp' });
+    const targetCookies = (cookies && cookies.length > 0) ? cookies : cachedCookies;
+    const cookieHeader = targetCookies.map(c => `${c.name}=${c.value}`).join('; ');
     const res = await fetch(url, {
       headers: {
         'Cookie': cookieHeader,
@@ -325,20 +328,23 @@ async function fetchLiveInfoDirect(lvid) {
 }
 
 // -------------------------------------------------------------
-// ログイン中ユーザーの現在放送中（ON_AIR）の配信を自動検出
+// ログイン中ユーザーの現在放送中または準備中の配信を自動検出
 // -------------------------------------------------------------
 async function fetchMyCurrentLiveInfo() {
   const account = await getAccountStatus();
   if (!account || !account.loggedIn || !account.user || !account.user.id) {
     console.log('[STSen] User is not logged in. Skipping auto-detect live.');
-    return null;
+    return { success: false, reason: 'not_logged_in', message: 'ニコニコにログインしていません。\n右上の「🔑 ログイン」からログインしてください。' };
   }
 
   const userId = account.user.id;
   console.log(`[STSen] Checking active live for user ${userId} (${account.user.nickname})...`);
   try {
+    const cookies = await session.defaultSession.cookies.get({ domain: 'nicovideo.jp' });
+    const targetCookies = (cookies && cookies.length > 0) ? cookies : cachedCookies;
+    const cookieHeader = targetCookies.map(c => `${c.name}=${c.value}`).join('; ');
+
     const url = `https://live.nicovideo.jp/watch/user/${userId}`;
-    const cookieHeader = cachedCookies.map(c => `${c.name}=${c.value}`).join('; ');
     const res = await fetch(url, {
       headers: {
         'Cookie': cookieHeader,
@@ -348,7 +354,7 @@ async function fetchMyCurrentLiveInfo() {
 
     if (!res.ok) {
       console.warn(`[STSen] Fetch user live page returned HTTP ${res.status}`);
-      return null;
+      return { success: false, reason: 'http_error', status: res.status, message: `ユーザー配信ページの取得に失敗しました (HTTP ${res.status})` };
     }
 
     const html = await res.text();
@@ -357,26 +363,51 @@ async function fetchMyCurrentLiveInfo() {
     if (m) {
       const raw = m[1].includes('&quot;') ? m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : m[1];
       const liveinfo = JSON.parse(raw);
-      if (liveinfo.program && liveinfo.program.status === 'ON_AIR') {
-        let lvid = liveinfo.program.nicoliveProgramId;
-        if (!lvid && liveinfo.program.watchPageUrl) {
-          const matchLv = liveinfo.program.watchPageUrl.match(/lv\d+/);
-          if (matchLv) lvid = matchLv[0];
+      const prog = liveinfo.program;
+      if (prog) {
+        // ステータス判定:
+        // ON_AIR: 放送中
+        // RELEASED / RESERVED: 枠作成直後（準備中・未開始・予約）
+        // OPEN: 開場中
+        const isActive = prog.status === 'ON_AIR' || prog.status === 'RELEASED' || prog.status === 'RESERVED' || prog.status === 'OPEN';
+
+        if (isActive) {
+          let lvid = prog.nicoliveProgramId;
+          if (!lvid && prog.watchPageUrl) {
+            const matchLv = prog.watchPageUrl.match(/lv\d+/);
+            if (matchLv) lvid = matchLv[0];
+          }
+          if (lvid) {
+            console.log(`[STSen] Active live detected: ${lvid} (status: ${prog.status}) - "${prog.title}"`);
+            latestLvid = lvid;
+            liveProp[lvid] = liveinfo;
+            liveProp[lvid.replace(/^lv/, '')] = liveinfo;
+            return {
+              success: true,
+              lvid,
+              status: prog.status,
+              title: prog.title,
+              liveinfo
+            };
+          }
+        } else {
+          console.log(`[STSen] Program found for user but status is '${prog.status}' (title: "${prog.title}")`);
+          const statusText = prog.status === 'ENDED' ? '終了済み' : prog.status;
+          return {
+            success: false,
+            reason: 'not_on_air',
+            status: prog.status,
+            title: prog.title,
+            message: `現在放送中または準備中の配信はありません。\n直近の番組「${prog.title}」は${statusText}です。`
+          };
         }
-        if (lvid) {
-          console.log(`[STSen] Active live detected: ${lvid} - "${liveinfo.program.title}"`);
-          latestLvid = lvid;
-          liveProp[lvid] = liveinfo;
-          return { lvid, liveinfo };
-        }
-      } else {
-        console.log('[STSen] No active live currently ON_AIR for this user.');
       }
     }
   } catch (err) {
     console.error('[STSen] Error detecting current live:', err);
+    return { success: false, reason: 'error', error: err.message, message: '自動検出中にエラーが発生しました: ' + err.message };
   }
-  return null;
+  return { success: false, reason: 'not_found', message: '現在放送中または準備中の配信枠が見つかりませんでした。\nニコニコ生放送で番組枠を開始または作成してから再度お試しください。' };
 }
 
 // -------------------------------------------------------------
@@ -515,30 +546,35 @@ function initRemoteServer() {
   }
 }
 
+// メインウィンドウ用の URL を生成（Windows のパス区切り対策）
+function getMainWindowUrl(targetLvid) {
+  const mainHtmlPath = path.join(__dirname, 'src', 'main', 'main.html');
+  const fileUrlObj = url.pathToFileURL(mainHtmlPath);
+  if (targetLvid) {
+    fileUrlObj.search = `?lv=${targetLvid}`;
+  }
+  return fileUrlObj.href;
+}
+
 // メインウィンドウの作成・表示
 function createOrFocusMainWindow(lvid = '') {
   const targetLvid = lvid || latestLvid;
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (!isHeadlessArg) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
     if (targetLvid) {
-      const currentUrl = mainWindow.webContents.getURL();
-      if (!currentUrl.includes(`lv=${targetLvid}`)) {
-        const mainHtmlPath = path.join(__dirname, 'src', 'main', 'main.html');
-        const targetUrl = `file://${mainHtmlPath}?lv=${targetLvid}`;
-        console.log(`[STSen] Navigating existing window to: ${targetUrl}`);
-        mainWindow.loadURL(targetUrl);
-      }
+      const targetUrl = getMainWindowUrl(targetLvid);
+      console.log(`[STSen] Navigating existing window to: ${targetUrl}`);
+      mainWindow.loadURL(targetUrl);
     }
     return mainWindow;
   }
 
-  const query = targetLvid ? `?lv=${targetLvid}` : '';
-  const mainHtmlPath = path.join(__dirname, 'src', 'main', 'main.html');
-  const targetUrl = `file://${mainHtmlPath}${query}`;
+  const targetUrl = getMainWindowUrl(targetLvid);
 
   console.log(`[STSen] Creating MainWindow with URL: ${targetUrl} (headless: ${isHeadlessArg})`);
 

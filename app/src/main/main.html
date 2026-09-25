@@ -46,45 +46,45 @@
 <body>
 
 <!------------ タブ名 ------------>
-<header>
-  <div class="margin-lr-4" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <div class="btn-group">
-
-      <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown"
-              aria-haspopup="true" aria-expanded="false">
-        <img id="icon-thumbnail" src="../icons/icon-16.png" style="width:16px; height:16px;">
-      </button>
-      <div class="dropdown-menu">
-        <a id="create-next-live" class="dropdown-item" href="#">次枠を作成</a>
-        <div class="dropdown-divider"></div>
-        <a id="mylist-manager" class="dropdown-item" href="#">マイリストマネージャー</a>
-        <a id="open-video-db" class="dropdown-item" href="#">動画DB</a>
-        <a id="save-comment" class="dropdown-item" href="#">コメントをファイルに保存</a>
-        <div class="dropdown-divider"></div>
-        <a id="menu-remote-connect" class="dropdown-item" href="#">🌐 リモートホストに接続...</a>
-        <a id="menu-login" class="dropdown-item" href="#">ニコニコログイン (ブラウザ起動)</a>
-        <a id="menu-input-session" class="dropdown-item" href="#">🔑 セッションキー直接入力</a>
-        <a id="open-settings" class="dropdown-item" href="#">設定</a>
-        <a id="open-config-folder" class="dropdown-item" href="#">📁 設定フォルダを開く</a>
-        <a id="menu-reset-all-data" class="dropdown-item" href="#" style="color: #dc3545;">⚠️ アプリを完全初期化...</a>
-        <div class="dropdown-divider"></div>
-        <a id="open-about" class="dropdown-item" href="#">ℹ️ バージョン情報 (<span class="app-version-text">v99.99.99</span>)</a>
-        <div class="dropdown-divider"></div>
-        <a id="close-window" class="dropdown-item" href="#">閉じる</a>
+<header style="padding: 3px 6px;">
+  <div style="display: flex; flex-direction: column; width: 100%; gap: 3px;">
+    <!-- 1行目：配信情報（横幅を最大までめいっぱい使用してタイトルを表示） -->
+    <div id="header-info-row" style="display: flex; align-items: center; width: 100%; min-width: 0; gap: 8px;">
+      <div class="btn-group" style="flex-shrink: 0;">
+        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown"
+                aria-haspopup="true" aria-expanded="false" style="padding: 1px 5px; height: 22px; display: inline-flex; align-items: center;">
+          <img id="icon-thumbnail" src="../icons/icon-16.png" style="width:16px; height:16px;">
+        </button>
+        <div class="dropdown-menu">
+          <a id="create-next-live" class="dropdown-item" href="#">次枠を作成</a>
+          <div class="dropdown-divider"></div>
+          <a id="mylist-manager" class="dropdown-item" href="#">マイリストマネージャー</a>
+          <a id="open-video-db" class="dropdown-item" href="#">動画DB</a>
+          <a id="save-comment" class="dropdown-item" href="#">コメントをファイルに保存</a>
+          <div class="dropdown-divider"></div>
+          <a id="menu-remote-connect" class="dropdown-item" href="#">🌐 リモートホストに接続...</a>
+          <a id="menu-login" class="dropdown-item" href="#">ニコニコログイン (ブラウザ起動)</a>
+          <a id="menu-input-session" class="dropdown-item" href="#">🔑 セッションキー直接入力</a>
+          <a id="open-settings" class="dropdown-item" href="#">設定</a>
+          <a id="open-config-folder" class="dropdown-item" href="#">📁 設定フォルダを開く</a>
+          <a id="menu-reset-all-data" class="dropdown-item" href="#" style="color: #dc3545;">⚠️ アプリを完全初期化...</a>
+          <div class="dropdown-divider"></div>
+          <a id="open-about" class="dropdown-item" href="#">ℹ️ バージョン情報 (<span class="app-version-text">v99.99.99</span>)</a>
+          <div class="dropdown-divider"></div>
+          <a id="close-window" class="dropdown-item" href="#">閉じる</a>
+        </div>
       </div>
-    </div>
-    <span id="app-version-badge" class="badge badge-light" style="cursor: pointer; font-size: 10px; color: #6c757d; border: 1px solid #ced4da; padding: 2px 5px; user-select: none;" title="クリックで詳細バージョン情報を表示"><span class="app-version-text">v99.99.99</span></span>
-    <span id="community-id">co000000</span>
-    <span id="live-title">[オフライン]</span>
-    <span>放送主：<span id="live-caster">---</span></span>
 
-    <!-- リモート接続状態表示 -->
-    <span id="remote-connection-badge" class="badge badge-success" style="display: none; font-size: 11px; padding: 3px 7px; cursor: pointer;" title="クリックでリモート接続設定を開く">🌐 リモート接続中</span>
+      <span id="app-version-badge" class="badge badge-light" style="flex-shrink: 0; cursor: pointer; font-size: 10px; color: #6c757d; border: 1px solid #ced4da; padding: 2px 5px; user-select: none;" title="クリックで詳細バージョン情報を表示"><span class="app-version-text">v99.99.99</span></span>
+      <span id="live-title" style="flex: 1 1 auto; min-width: 0; font-weight: bold; font-size: 12px; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="[オフライン]">[オフライン]</span>
+      <span style="flex-shrink: 0; font-size: 11px; color: #6c757d; white-space: nowrap;">放送主：<span id="live-caster" style="color: #212529; font-weight: 500;">---</span></span>
+
+      <!-- リモート接続状態表示 -->
+      <span id="remote-connection-badge" class="badge badge-success" style="display: none; flex-shrink: 0; font-size: 11px; padding: 3px 7px; cursor: pointer;" title="クリックでリモート接続設定を開く">🌐 リモート接続中</span>
     </div>
 
-    <!-- アカウント状態 & 配信ID手動接続 & リモート接続ボタン -->
-    <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+    <!-- 2行目：各種操作ツールバー（アカウント状態 & 配信ID手動接続 & リモート接続ボタン） -->
+    <div id="header-controls-row" style="display: flex; align-items: center; justify-content: flex-end; width: 100%; gap: 6px; padding-top: 3px; border-top: 1px solid #dcdce0;">
       <button id="btn-remote-connect-open" class="btn btn-outline-primary btn-sm" type="button" style="height: 24px; font-size: 11px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px;" title="リモートホストに接続して遠隔操作します">
         🌐 リモート接続
       </button>

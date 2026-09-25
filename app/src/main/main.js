@@ -2441,15 +2441,23 @@ var NicoLiveHelper = {
                     if (window.stsen && window.stsen.detectCurrentLive) {
                         const res = await window.stsen.detectCurrentLive();
                         if (res && res.lvid) {
-                            console.log('[STSen] Detected live:', res.lvid);
-                            window.location.href = 'main.html?lv=' + res.lvid;
+                            console.log('[STSen] Detected live:', res.lvid, res.title);
+                            $('#input-manual-lvid').val(res.lvid);
+                            if (window.stsen.loadLive) {
+                                await window.stsen.loadLive(res.lvid);
+                            } else {
+                                window.location.href = 'main.html?lv=' + res.lvid;
+                            }
+                            return;
+                        } else if (res && res.message) {
+                            alert(res.message);
                             return;
                         }
                     }
-                    alert('現在放送中（ON AIR）の配信は見つかりませんでした。\nニコニコ生放送で番組を開始してから再度お試しください。');
+                    alert('現在放送中（ON AIR）または準備中の配信は見つかりませんでした。\nニコニコ生放送で番組枠を開始または作成してから再度お試しください。');
                 } catch (err) {
                     console.error('[STSen] Error detecting live:', err);
-                    alert('放送中の配信の検出に失敗しました: ' + err.message);
+                    alert('放送枠の検出に失敗しました: ' + err.message);
                 } finally {
                     $btn.prop('disabled', false).html(originalText);
                 }
@@ -2880,12 +2888,11 @@ var NicoLiveHelper = {
             }
 
             if( this.liveProp.program.providerType === 'official' ){
-                $( '#community-id' ).text( 'OFFICIAL' );
+                $( '#live-caster' ).text( '公式' );
             }else{
-                $( '#community-id' ).text( this.liveProp.community.id );
-                $( '#live-caster' ).text( this.liveProp.program.supplier.name );
+                $( '#live-caster' ).text( this.liveProp.program.supplier ? this.liveProp.program.supplier.name : '---' );
             }
-            $( '#live-title' ).text( this.liveProp.program.title );
+            $( '#live-title' ).text( this.liveProp.program.title ).attr( 'title', this.liveProp.program.title );
 
             if( !this.isCaster() ){
                 // コメント送信タイプを視聴者に設定
