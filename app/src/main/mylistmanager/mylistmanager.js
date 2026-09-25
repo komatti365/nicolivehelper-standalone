@@ -167,7 +167,7 @@ let MyListManager = {
         let sec = parseInt( item.video.duration % 60 );
 
         $( elem.querySelector( '.video-title' ) ).text( `${item.video.id} ${item.video.title}` );
-        $( elem.querySelector( '.open-page' ) ).attr( 'href', `http://www.nicovideo.jp/watch/${item.video.id}` );
+        $( elem.querySelector( '.open-page' ) ).attr( 'href', `https://www.nicovideo.jp/watch/${item.video.id}` );
 
         let addedAtStr = item.addedAt ? " (登録:" + item.addedAt + ")" : "";
         details.appendChild( document.createTextNode( "投稿:" + posteddate + addedAtStr + " 時間:" + (min + ":" + (sec < 10 ? ("0" + sec) : sec)) ) );
